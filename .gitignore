@@ -30,3 +30,14 @@
 *.exe
 *.out
 *.app
+
+# project
+.vs/
+debug/
+release/
+.qmake.stash
+*.pdb
+VideoPlayDemo.pro.user
+VideoPlayDemo.pro.user.*
+VideoPlayDemo.vcxproj
+VideoPlayDemo.vcxproj.*
