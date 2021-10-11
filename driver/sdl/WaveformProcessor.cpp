@@ -23,10 +23,10 @@ void WaveformProcessor::addSample(int sourceId, std::shared_ptr<SampleBuffer> bu
 {
     mDataMap.lock();
     if(mDataMap.contains(sourceId)) {
-        mDataMap[sourceId].append(buffer);
+        mDataMap[sourceId].push_back(buffer);
     } else{
-        QList<std::shared_ptr<SampleBuffer>> list;
-        list.append(buffer);
+        std::list<std::shared_ptr<SampleBuffer>> list;
+        list.push_back(buffer);
         mDataMap.insert(sourceId, list);
     }
     mDataMap.unlock();
@@ -34,15 +34,18 @@ void WaveformProcessor::addSample(int sourceId, std::shared_ptr<SampleBuffer> bu
     emit sigRun();
 }
 
-QList<int> WaveformProcessor::getShowData(int sourceId)
+QList<int> WaveformProcessor::getShowData(int sourceId, int maxlen)
 {
     QList<int> list;
 
-    QMutexLocker locker(&mShowData.mutex());
+    LockedMapLocker lk(mShowData.mutex());
+
     if(mShowData.contains(sourceId)) {
-        int len = mShowData[sourceId].size();
-        for(int i=0; i<len; i++) {
-            list.append(mShowData[sourceId].at(i));
+        std::list<int> &dataList = mShowData[sourceId];
+        maxlen = maxlen? maxlen: dataList.size();
+        std::list<int>::iterator itr = dataList.begin();
+        for(int i=0; i<maxlen && itr!=dataList.end(); i++) {
+            list.append(*itr);
         }
     }
 
@@ -60,7 +63,7 @@ void WaveformProcessor::clear(int sourceId)
 void WaveformProcessor::run()
 {
     mDataMap.lock();
-    QList<int> keys = mDataMap.keys();
+    std::list<int> keys = mDataMap.keys();
     mDataMap.unlock();
 
     int count = 0;
@@ -77,7 +80,8 @@ void WaveformProcessor::run()
         if(!isEmpty) {
             std::shared_ptr<SampleBuffer> buffer;
             mDataMap.lock();
-            buffer = mDataMap[idx].takeFirst();
+            buffer = mDataMap[idx].front();
+            mDataMap[idx].pop_front();
             mDataMap.unlock();
 
             addData(idx, buffer.get());
@@ -111,16 +115,17 @@ void WaveformProcessor::addData(int sourceId, SampleBuffer *buffer)
 
 void WaveformProcessor::addWave(int sourceId, int wave)
 {
-    QMutexLocker locker(&mShowData.mutex());
+    LockedMapLocker lk(mShowData.mutex());
+
     if(mShowData.contains(sourceId)) {
-        mShowData[sourceId].append(wave);
+        mShowData[sourceId].push_back(wave);
         for(;mShowData[sourceId].size()>LIMIT_SHOW_SIZE;)
-            mShowData[sourceId].removeFirst();
+            mShowData[sourceId].pop_front();
     } else {
-        QList<int> list;
-        list.append(wave);
+        std::list<int> list;
+        list.push_back(wave);
         mShowData.insert(sourceId, list);
     }
 
-    qDebug()<<"addWave"<<sourceId<<"wave:"<<wave;
+//    qDebug()<<"addWave"<<sourceId<<"wave:"<<wave;
 }

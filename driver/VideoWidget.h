@@ -13,7 +13,7 @@
 #include "model/MediaData.h"
 #include "model/MediaQueue.h"
 #include "decoder/FFmpegMediaDecoder.h"
-#include "driver/sdl/SdlSmtAudioPlayer.h"
+#include "driver/sdl/SmtAudioPlayer.h"
 #include "VideoBuffer.h"
 #include <memory>
 
@@ -40,7 +40,7 @@ private:
 
     FFmpegMediaDecoder *decoder;
 
-    SdlSmtAudioPlayer *sdlSmtAudioPlayer;
+    SmtAudioPlayer *smtAudioPlayer;
 
     int mSourceId;
     QList<QSize> sizeList;

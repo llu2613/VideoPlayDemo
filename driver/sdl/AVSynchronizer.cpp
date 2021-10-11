@@ -1,12 +1,13 @@
 #include "AVSynchronizer.h"
 
-AVSynchronizer::AVSynchronizer(QObject *parent) : QObject(parent)
+AVSynchronizer::AVSynchronizer()
 {
 
 }
 
 void AVSynchronizer::setPlayingSample(std::shared_ptr<SampleBuffer> buffer)
 {
-    QMutexLocker locker(&mSampleMutex);
+    std::lock_guard<std::mutex> lk(mSampleMutex);
+
     mSampleBuffer.copy(*buffer.get());
 }

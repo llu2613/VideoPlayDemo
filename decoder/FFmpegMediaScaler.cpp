@@ -50,7 +50,7 @@ void FFmpegMediaScaler::setOutAudio(enum AVSampleFormat fmt, int rate, uint64_t 
     out_audio_ch = ch_layout;
 }
 
-void FFmpegMediaScaler::setOutVideo(int width, int height, enum AVPixelFormat fmt)
+void FFmpegMediaScaler::setOutVideo(enum AVPixelFormat fmt, int width, int height)
 {
     out_video_width = width;
     out_video_height = height;

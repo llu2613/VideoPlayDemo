@@ -30,7 +30,7 @@ public:
     void setOutAudio2(int rate, int channels);
     void setOutVideo2(int width, int height);
     void setOutAudio(enum AVSampleFormat fmt, int rate, uint64_t ch_layout);
-    void setOutVideo(int width, int height, enum AVPixelFormat fmt);
+    void setOutVideo(enum AVPixelFormat fmt, int width, int height);
 
     void setInputUrl(QString url);
 

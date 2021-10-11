@@ -1,15 +1,10 @@
 #include "SdlAudioDevice.h"
-#include <QMutexLocker>
-#include <QScopedArrayPointer>
-#include <QTextCodec>
-#include <QDebug>
+#include <memory>
 
 #define MAX_FRAME_NUM 3000
 
-SdlAudioDevice::SdlAudioDevice(int iscapture, QObject *parent)
-    : QObject(parent), mDataMutex(QMutex::Recursive)
+SdlAudioDevice::SdlAudioDevice(int iscapture)
 {
-    mTextCodec = QTextCodec::codecForName("UTF-8");
     mDeviceId = 0;
     mIscapture = iscapture?SDL_TRUE:SDL_FALSE;
     SDL_zero(mDesiredSpec);
@@ -43,7 +38,7 @@ int SdlAudioDevice::open(const char *device, SDL_AudioSpec spec)
             SDL_Log("We didn't get %x(got:%x) audio format.", spec.format, mObtainedSpec.format);
         }
         SDL_PauseAudioDevice(mDeviceId, 0); /* start audio playing. */
-        qDebug()<<"SDL_AudioDeviceID:"<<mDeviceId;
+        printf("SDL_AudioDeviceID: %d", mDeviceId);
         mDesiredSpec = spec;
         memccpy(mDeviceName, device, '\0', sizeof(mDeviceName));
         mState = Open;
@@ -75,7 +70,7 @@ void SdlAudioDevice::close()
     SDL_PauseAudioDevice(mDeviceId, 1);
     clearAll();
     SDL_CloseAudioDevice(mDeviceId);
-    qDebug()<<"SDL_CloseAudioDevice:"<<mDeviceId;
+    printf("SDL_CloseAudioDevice: %d", mDeviceId);
     mDeviceId = 0;
 }
 
@@ -84,7 +79,7 @@ void SdlAudioDevice::addData(int index, Uint8* buf, int len,
 {
     SampleBuffer *buffer = new SampleBuffer();
     if(!buffer->copy(buf, len)) {
-        qCritical()<<"No memory allocation!";
+        printf("No memory allocation!");
         return;
     }
 
@@ -92,63 +87,76 @@ void SdlAudioDevice::addData(int index, Uint8* buf, int len,
     buffer->timestamp = timestamp;
     buffer->sampleBytes = 16/8;
 
-    QMutexLocker locker(&mDataMutex);
-    if(mDataMap.contains(index)) {
-        mDataMap[index].append(buffer);
+    LockedMapLocker lk(mDataMap.mutex());
+
+    if(mDataMap.find(index)!=mDataMap.end()) {
+        mDataMap[index].push_back(buffer);
 
         int discard = 0;
         for(int i= mDataMap[index].size(); i>MAX_FRAME_NUM; i--) {
-            SampleBuffer *b = mDataMap[index].takeFirst();
-            delete b;
+            delete mDataMap[index].front();
+            mDataMap[index].pop_front();
             discard++;
         }
         if(discard)
-            qDebug()<<"AudioCard buffer discard"<<discard<<"frames,"
-                   <<mTextCodec->toUnicode(name())<<"index:"<<index;
+            printf("AudioCard buffer discard %d frames, %s index:%d",
+                   discard, name(), index);
     } else {
-        mDataMap.insert(index, QList<SampleBuffer*>()<<buffer);
+        std::list<SampleBuffer*> list;
+        list.push_back(buffer);
+        mDataMap.insert(index, list);
     }
 
-    if(mDataMap[index].length()>MAX_FRAME_NUM*2/3) {
-        qDebug()<<"AudioCard buffer is too long:"<<mTextCodec->toUnicode(name())
-               <<"index:"<<index<<"buf:"<<len<<"list:"<<mDataMap[index].length();
+    if(mDataMap[index].size()>MAX_FRAME_NUM*2/3) {
+        printf("AudioCard buffer is too long:%s index: %d buf:%d list:%d",
+               name(), index, len, mDataMap[index].size());
     }
 }
 
-QList<int> SdlAudioDevice::indexs()
+std::list<int> SdlAudioDevice::indexs()
 {
-    QMutexLocker locker(&mDataMutex);
-    return mDataMap.keys();
+    LockedMapLocker lk(mDataMap.mutex());
+
+    std::list<int> keys;
+    for(std::map<int, std::list<SampleBuffer*>>::iterator it=mDataMap.begin();
+             it!=mDataMap.end(); ++it) {
+        keys.push_back(it->first);
+    }
+
+    return keys;
 }
 
 int SdlAudioDevice::bufferSize(int index)
 {
-    QMutexLocker locker(&mDataMutex);
-    if(mDataMap.contains(index))
+    LockedMapLocker lk(mDataMap.mutex());
+
+    if(mDataMap.find(index)!=mDataMap.end())
         return mDataMap[index].size();
     return 0;
 }
 
 int SdlAudioDevice::takeIndex(int index, Uint8 *stream, int len)
 {
-    QMutexLocker locker(&mDataMutex);
-    if(mDataMap.contains(index)) {
-        QList<SampleBuffer*> &list = mDataMap[index];
+    LockedMapLocker lk(mDataMap.mutex());
+
+    if(mDataMap.find(index)!=mDataMap.end()) {
+        std::list<SampleBuffer*> &list = mDataMap[index];
         int tLen = 0;
         for(;tLen<len&&list.size();) {
-            SampleBuffer* buffer = list.first();
+            SampleBuffer* buffer = list.front();
             int remain = buffer->len()-buffer->pos();
             int cpLen = remain>(len-tLen)?(len-tLen):remain;
             memcpy(stream+tLen, buffer->data()+buffer->pos(), cpLen);
             buffer->setPos(buffer->pos()+cpLen);
             if(buffer->pos()>=buffer->len()) {
-                SampleBuffer *b = list.takeFirst();
-                delete b;
+                delete list.front();
+                list.pop_front();
             }
             tLen += cpLen;
         }
         if(tLen&&(tLen<len||!list.size()))
-            qDebug()<<"sample buffer is too short, index"<<index<<tLen<<len<<list.size();
+            printf("sample buffer is too short, index: %d, (%d,%d) list:%d",
+                   index, tLen, len, list.size());
         return tLen;
     }
     return 0;
@@ -156,19 +164,20 @@ int SdlAudioDevice::takeIndex(int index, Uint8 *stream, int len)
 
 int SdlAudioDevice::takeIndex(int index, SampleBuffer *buffer, int len)
 {
-    QScopedArrayPointer<Uint8> data(new Uint8[len]);
-    memset(data.data(), 0, len);
+    std::unique_ptr<Uint8[]> data(new Uint8[len]);
+    memset(data.get(), 0, len);
 
-    QMutexLocker locker(&mDataMutex);
+    LockedMapLocker lk(mDataMap.mutex());
+
     if(mDataMap.contains(index)) {
-        QList<SampleBuffer*> &list = mDataMap[index];
+        std::list<SampleBuffer*> &list = mDataMap[index];
         if(list.size()) {
-            SampleBuffer* first = list.first();
+            SampleBuffer* first = list.front();
             buffer->channels = first->channels;
             buffer->timestamp = first->timestamp;
             buffer->sampleBytes = first->sampleBytes;
-            int cp = takeIndex(index, data.data(), len);
-            buffer->copy(data.data(), len);
+            int cp = takeIndex(index, data.get(), len);
+            buffer->copy(data.get(), len);
             return cp;
         }
     }
@@ -178,14 +187,18 @@ int SdlAudioDevice::takeIndex(int index, SampleBuffer *buffer, int len)
 int SdlAudioDevice::take(Uint8 *stream, int len)
 {
     int dataCnt = 0;
-    QScopedArrayPointer<Uint8> data(new Uint8[len]);
+    std::unique_ptr<Uint8[]> data(new Uint8[len]);
+
+    LockedMapLocker lk(mDataMap.mutex());
+
     //多声源混音
-    QMutexLocker locker(&mDataMutex);
-    for(int index: mDataMap.keys()) {
-        memset(data.data(), 0, len);
-        int cpLen = takeIndex(index, data.data(), len);
+    for(std::map<int, std::list<SampleBuffer*>>::iterator it=mDataMap.begin();
+             it!=mDataMap.end(); ++it) {
+        int index = it->first;
+        memset(data.get(), 0, len);
+        int cpLen = takeIndex(index, data.get(), len);
         if(cpLen) {
-            SDL_MixAudioFormat(stream, data.data(),
+            SDL_MixAudioFormat(stream, data.get(),
                                mDesiredSpec.format, cpLen, SDL_MIX_MAXVOLUME);
             dataCnt++;
         }
@@ -196,27 +209,32 @@ int SdlAudioDevice::take(Uint8 *stream, int len)
 
 void SdlAudioDevice::clear(int index)
 {
-    QMutexLocker locker(&mDataMutex);
-    if(mDataMap.contains(index)) {
-        QList<SampleBuffer*> &list = mDataMap[index];
+    LockedMapLocker lk(mDataMap.mutex());
+
+    if(mDataMap.find(index)!=mDataMap.end()) {
+        std::list<SampleBuffer*> &list = mDataMap[index];
         for(;list.size()>0;) {
-            SampleBuffer *b = list.takeFirst();
-            delete b;
+            delete list.front();
+            list.pop_front();
         }
-        mDataMap.remove(index);
+        mDataMap.erase(index);
     }
 }
 
 void SdlAudioDevice::clearAll()
 {
-    QMutexLocker locker(&mDataMutex);
-    for(int index: mDataMap.keys()) {
+    LockedMapLocker lk(mDataMap.mutex());
+
+    for(std::map<int, std::list<SampleBuffer*>>::iterator it=mDataMap.begin();
+             it!=mDataMap.end(); ++it) {
+        int index = it->first;
         clear(index);
     }
     mDataMap.clear();
 }
 
-bool SdlAudioDevice::isOpened() {
+bool SdlAudioDevice::isOpened()
+{
     return mState==Open||mState==Pause;
 }
 

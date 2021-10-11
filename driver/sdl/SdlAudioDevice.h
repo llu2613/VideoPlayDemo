@@ -1,10 +1,8 @@
 #ifndef SDLAUDIODEVICE_H
 #define SDLAUDIODEVICE_H
 
-#include <QObject>
-#include <QList>
-#include <QMap>
-#include <QMutex>
+#include <list>
+#include "LockedMap.h"
 #include "samplebuffer.h"
 
 extern "C"{
@@ -15,15 +13,14 @@ extern "C"{
 #undef main
 
 
-class SdlAudioDevice : public QObject
+class SdlAudioDevice
 {
-    Q_OBJECT
 public:
     enum CardState{
         Close, Open, Pause
     };
 
-    explicit SdlAudioDevice(int iscapture=0, QObject *parent = nullptr);
+    explicit SdlAudioDevice(int iscapture=0);
 
     const char* name();
 
@@ -41,7 +38,7 @@ public:
 
     void addData(int index, Uint8* buf, int len, double timestamp=0);
 
-    QList<int> indexs();
+    std::list<int> indexs();
 
     int bufferSize(int index);
 
@@ -58,20 +55,14 @@ public:
 
     void print_status();
 
-signals:
-
-public slots:
-
 
 private:
     CardState mState;
     int mIscapture;
-    QTextCodec *mTextCodec;
     char mDeviceName[256];
     SDL_AudioDeviceID mDeviceId;
     SDL_AudioSpec mDesiredSpec, mObtainedSpec;
-    QMutex mDataMutex;
-    QMap<int, QList<SampleBuffer*>> mDataMap;
+    LockedMap<int, std::list<SampleBuffer*>> mDataMap;
 
 };
 

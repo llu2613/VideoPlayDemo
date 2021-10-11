@@ -1,26 +1,21 @@
 #ifndef AVSYNCHRONIZER_H
 #define AVSYNCHRONIZER_H
 
-#include <QObject>
-#include <QMutex>
+#include <mutex>
 #include <memory>
 #include "SampleBuffer.h"
 
-class AVSynchronizer : public QObject
+class AVSynchronizer
 {
-    Q_OBJECT
 public:
-    explicit AVSynchronizer(QObject *parent = nullptr);
+    explicit AVSynchronizer();
 
     void setPlayingSample(std::shared_ptr<SampleBuffer> buffer);
 
 private:
-    QMutex mSampleMutex;
+    std::mutex mSampleMutex;
     SampleBuffer mSampleBuffer;
 
-signals:
-
-public slots:
 };
 
 #endif // AVSYNCHRONIZER_H

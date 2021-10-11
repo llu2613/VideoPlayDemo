@@ -1,8 +1,5 @@
 #include "SdlAudioPlayer.h"
 #include <string.h>
-#include <QThread>
-#include <QMutexLocker>
-#include <QDebug>
 
 #define SUB_SYSTEM (SDL_INIT_AUDIO|SDL_INIT_TIMER)
 
@@ -17,62 +14,69 @@ void SdlAudioPlayer::audioCallback(void *data, Uint8 *stream, int len)
     SoundCard *card = static_cast<SoundCard*>(data);
 
     if(!card) {
-        qDebug()<<"sdl_audio_callback *data is broken!";
+        printf("sdl_audio_callback *data is broken!");
         return;
     }
 
     SdlAudioPlayer *player = static_cast<SdlAudioPlayer*>(card->player);
-/*
+//方法一
     card->mutex.lock();
     if(card->device) {
-        int count = 0;
-        std::shared_ptr<QMap<int, std::shared_ptr<SampleBuffer>>> map(
-                    new QMap<int, std::shared_ptr<SampleBuffer>>);
+        std::map<int, std::shared_ptr<SampleBuffer>> dataMap;
 
         SampleBuffer *temp = new SampleBuffer;
         for(int idx: card->device->indexs()) {
             int cp = card->device->takeIndex(idx, temp, len);
-
-            SDL_MixAudioFormat(stream, temp->data(),
-                               card->device->format(), cp>len?len:cp, SDL_MIX_MAXVOLUME);
-
-            if(cp>0&&player) {
+            if(cp>0) {
                 std::shared_ptr<SampleBuffer> b(new SampleBuffer);
                 b->copy(*temp);
-                map->insert(idx, b);
-                count++;
+                dataMap.insert(std::pair<int, std::shared_ptr<SampleBuffer>>(idx,b));
             }
         }
         delete temp;
 
-        if(player&&count) {
-            player->onCardPlaying(map);
+        if(player&&dataMap.size()) {
+            player->onCardDataPrepared(card->id, dataMap);
+        }
+
+        for(std::map<int, std::shared_ptr<SampleBuffer>>::iterator it=dataMap.begin();
+                 it!=dataMap.end(); ++it) {
+            std::shared_ptr<SampleBuffer> buffer = it->second;
+            SDL_MixAudioFormat(stream, buffer->data(),
+                               card->device->format(), buffer->len(), SDL_MIX_MAXVOLUME);
         }
     }
     card->mutex.unlock();
-*/
-
-    card->mutex.lock();
-    int dataCnt = card->device->take(stream, len);
-    if(!dataCnt) {
-        card->device->pause();
-    }
-    card->mutex.unlock();
+//方法二
+//    card->mutex.lock();
+//    int dataCnt = card->device->take(stream, len);
+//    if(!dataCnt) {
+//        card->device->pause();
+//    }
+//    card->mutex.unlock();
 }
 
-SdlAudioPlayer::SdlAudioPlayer(QObject *parent) : QObject(parent)
+SdlAudioPlayer::SdlAudioPlayer()
 {
     mIsInitSys = false;
-    mTextCodec = QTextCodec::codecForName("UTF-8");
 
     for(int i=0; i<MAX_CARD_NUM; i++) {
         mCardArray[i].player = this;
-        mCardArray[i].name = QString("NO.%1").arg(i);
+        mCardArray[i].id = i;
     }
+    initAudioSystem();
+}
+
+SdlAudioPlayer::~SdlAudioPlayer()
+{
+    quiteAudioSystem();
 }
 
 bool SdlAudioPlayer::initAudioSystem()
 {
+    if(mIsInitSys)
+        return true;
+
     /* Load the SDL library */
     if (SDL_InitSubSystem(SUB_SYSTEM) < 0) {
         printf("Couldn't initialize SDL: %s\n", SDL_GetError());
@@ -90,6 +94,7 @@ bool SdlAudioPlayer::initAudioSystem()
 void SdlAudioPlayer::quiteAudioSystem()
 {
     if(mIsInitSys) {
+        mIsInitSys = false;
         SDL_QuitSubSystem(SUB_SYSTEM);
     }
 }
@@ -99,7 +104,7 @@ void SdlAudioPlayer::addData(int cardId, int sourceId, Uint8 *buf, int bufLen,
 {
     if(cardId>=0&&cardId<MAX_CARD_NUM) {
     } else {
-        qDebug()<<"Invalid sound card id:"<<cardId;
+        printf("Invalid sound card id:%d", cardId);
         return;
     }
 
@@ -111,10 +116,10 @@ void SdlAudioPlayer::addData(int cardId, int sourceId, Uint8 *buf, int bufLen,
             card.device->addData(sourceId, buf, bufLen, timestamp);
             card.device->resume();
         } else {
-            qDebug()<<"Sound card is not initiailizing, cardId:"<<cardId;
+            printf("Sound card is not initiailizing, cardId:%d", cardId);
         }
     } else {
-        qDebug()<<"SoundCard "<<cardId<<" is disable!";
+        printf("SoundCard %d is disable!", cardId);
     }
     card.mutex.unlock();
 }
@@ -123,7 +128,7 @@ void SdlAudioPlayer::clearData(int cardId, int sourceId)
 {
     if(cardId>=0&&cardId<MAX_CARD_NUM) {
     } else {
-        qDebug()<<"Invalid sound card id:"<<cardId;
+        printf("Invalid sound card id:%d", cardId);
         return;
     }
 
@@ -133,7 +138,7 @@ void SdlAudioPlayer::clearData(int cardId, int sourceId)
     if(card.device) {
         card.device->clear(sourceId);
     } else {
-        qDebug()<<"Sound card is not initiailizing, cardId:"<<cardId;
+        printf("Sound card is not initiailizing, cardId:%d", cardId);
     }
     card.mutex.unlock();
 }
@@ -142,7 +147,7 @@ void SdlAudioPlayer::clearCardData(int cardId)
 {
     if(cardId>=0&&cardId<MAX_CARD_NUM) {
     } else {
-        qDebug()<<"Invalid sound card id:"<<cardId;
+        printf("Invalid sound card id:%d", cardId);
         return;
     }
 
@@ -152,7 +157,7 @@ void SdlAudioPlayer::clearCardData(int cardId)
     if(card.device) {
         card.device->clearAll();
     } else {
-        qDebug()<<"Sound card is not initiailizing, cardId:"<<cardId;
+        printf("Sound card is not initiailizing, cardId:%d", cardId);
     }
     card.mutex.unlock();
 }
@@ -169,11 +174,12 @@ void SdlAudioPlayer::clearSourceData(int sourceId)
     }
 }
 
-int SdlAudioPlayer::openCard(QString name,
-             int freq,
-             SDL_AudioFormat format,
-             Uint8 channels,
-             Uint16 samples)
+int SdlAudioPlayer::openCard(
+            std::string name,
+            int freq,
+            SDL_AudioFormat format,
+            Uint8 channels,
+            Uint16 samples)
 {
     SDL_AudioSpec wanted;
     SDL_zero(wanted);
@@ -185,15 +191,9 @@ int SdlAudioPlayer::openCard(QString name,
     return openCard(name, wanted);
 }
 
-int SdlAudioPlayer::openCard(QString name, SDL_AudioSpec wanted)
+int SdlAudioPlayer::openCard(std::string name, SDL_AudioSpec wanted)
 {
-    QByteArray name_c = mTextCodec->fromUnicode(name);
-
-    return openCard(name_c.data(), wanted);
-}
-
-int SdlAudioPlayer::openCard(const char* name, SDL_AudioSpec wanted)
-{
+    const char* name_c = name.c_str();
     //找卡
     int findIndex = -1;
     int emptyIndex = -1;
@@ -201,7 +201,7 @@ int SdlAudioPlayer::openCard(const char* name, SDL_AudioSpec wanted)
         if(findIndex==-1 && mCardArray[i].device) {
             SoundCard &card = mCardArray[i];
             card.mutex.lock();
-            if(!strcmp(card.device->name(), name))
+            if(!strcmp(card.device->name(), name_c))
                 findIndex = i;
             card.mutex.unlock();
         }
@@ -214,7 +214,7 @@ int SdlAudioPlayer::openCard(const char* name, SDL_AudioSpec wanted)
         SoundCard &card = mCardArray[findIndex];
         card.mutex.lock();
         if(card.device && card.device->isOpened()) {
-            qDebug()<<"SoundCard "<<card.name<<" is already opened!";
+            printf("SoundCard %s had been opened!", name);
             return findIndex;
         }
         card.mutex.unlock();
@@ -227,12 +227,12 @@ int SdlAudioPlayer::openCard(const char* name, SDL_AudioSpec wanted)
             wanted.callback = SdlAudioPlayer::audioCallback;
             wanted.userdata = &card;
             card.device->close();
-            int ret = card.device->open(name, wanted)>0;
+            int ret = card.device->open(name_c, wanted)>0;
             card.enable = ret>0;
-            card.name = mTextCodec->toUnicode(name);
+            card.name = name;
+            printf("openCard: %s, cardId: %d", name, findIndex);
         }
         card.mutex.unlock();
-        qDebug()<<"openCard"<<card.name<<findIndex;
         return findIndex;
     } else if(emptyIndex!=-1) {
         SoundCard &card = mCardArray[emptyIndex];
@@ -241,12 +241,13 @@ int SdlAudioPlayer::openCard(const char* name, SDL_AudioSpec wanted)
         if(card.device) {
             wanted.callback = SdlAudioPlayer::audioCallback;
             wanted.userdata = &card;
-            int ret = card.device->open(name, wanted)>0;
+            int ret = card.device->open(name_c, wanted)>0;
             card.enable = ret>0;
-            card.name = mTextCodec->toUnicode(name);
+            card.name = name;
+            printf("openCard: %s, cardId: %d", name, emptyIndex);
         }
         card.mutex.unlock();
-        qDebug()<<"openCard"<<card.name<<emptyIndex;
+
         return emptyIndex;
     }
 
@@ -257,7 +258,7 @@ void SdlAudioPlayer::pauseCard(int cardId, int ispause)
 {
     if(cardId>=0&&cardId<MAX_CARD_NUM) {
     } else {
-        qDebug()<<"Invalid sound card id:"<<cardId;
+        printf("Invalid sound card id:%d", cardId);
         return;
     }
 
@@ -276,7 +277,7 @@ void SdlAudioPlayer::closeCard(int cardId)
 {
     if(cardId>=0&&cardId<MAX_CARD_NUM) {
     } else {
-        qDebug()<<"Invalid sound card id:"<<cardId;
+        printf("Invalid sound card id:%d", cardId);
         return;
     }
 
@@ -295,7 +296,7 @@ int SdlAudioPlayer::bufferSize(int cardId, int sourceId)
 {
     if(cardId>=0&&cardId<MAX_CARD_NUM) {
     } else {
-        qDebug()<<"Invalid sound card id:"<<cardId;
+        printf("Invalid sound card id:%d", cardId);
         return 0;
     }
 
@@ -307,53 +308,40 @@ int SdlAudioPlayer::bufferSize(int cardId, int sourceId)
     if(card.device) {
         size = card.device->bufferSize(sourceId);
     } else {
-        qDebug()<<"Sound card is not initiailizing, cardId:"<<cardId;
+        printf("Sound card is not initiailizing, cardId:%d", cardId);
     }
     card.mutex.unlock();
 
     return size;
 }
 
-void SdlAudioPlayer::test()
+void SdlAudioPlayer::onCardDataPrepared(int cardId, std::map<int, std::shared_ptr<SampleBuffer>> &dataMap)
 {
-    SDL_AudioSpec wanted;
-    SDL_zero(wanted);
-    wanted.freq = 44100;
-    wanted.format = AUDIO_F32SYS;
-    wanted.channels = 1;
-    wanted.samples = 4096;
-    wanted.callback = NULL;
-
-    SDL_AudioSpec spec;
-
-    SDL_AudioDeviceID devid_out = SDL_OpenAudioDevice(NULL, SDL_FALSE, &wanted, &spec, SDL_AUDIO_ALLOW_ANY_CHANGE);
-    if (!devid_out) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't open an audio device for playback: %s!\n", SDL_GetError());
-        SDL_Quit();
-        exit(1);
-    }
+    //播放数据回传
+    //线程调用，注意加锁和实时返回
 }
 
-QList<QString> SdlAudioPlayer::devices()
+std::list<std::string> SdlAudioPlayer::devices()
 {
-    QStringList cardList;
+    std::list<std::string> list;
     int n = SDL_GetNumAudioDevices(SDL_FALSE);
     for(int i=0; i<n; i++) {
-        const char* name_c = SDL_GetAudioDeviceName(i, SDL_FALSE);
-        cardList.append(mTextCodec->toUnicode(name_c));
+        std::string name = SDL_GetAudioDeviceName(i, SDL_FALSE);
+        list.push_back(name);
     }
 
-    return cardList;
+    return list;
 }
 
-int SdlAudioPlayer::getCardId(QString name)
+int SdlAudioPlayer::getCardId(std::string name)
 {
-    QByteArray name_c = mTextCodec->fromUnicode(name);
     for(int i=0; i<MAX_CARD_NUM; i++) {
         SoundCard &card = mCardArray[i];
-        QMutexLocker(&card.mutex);
+
+        std::lock_guard<std::mutex> lk(card.mutex);
+
         if(card.device
-                && !strcmp(card.device->name(), name_c)) {
+                && !name.compare(card.device->name())) {
             return i;
         }
     }
@@ -367,7 +355,9 @@ int SdlAudioPlayer::getCardIdByDevid(SDL_AudioDeviceID devid)
 
     for(int i=0; i<MAX_CARD_NUM; i++) {
         SoundCard &card = mCardArray[i];
-        QMutexLocker(&card.mutex);
+
+        std::lock_guard<std::mutex> lk(card.mutex);
+
         if(card.device
                 && card.device->devid()==devid) {
             return i;
@@ -377,13 +367,15 @@ int SdlAudioPlayer::getCardIdByDevid(SDL_AudioDeviceID devid)
     return -1;
 }
 
-QString SdlAudioPlayer::getCardName(int cardId)
+std::string SdlAudioPlayer::getCardName(int cardId)
 {
     if(cardId>=0&&cardId<MAX_CARD_NUM) {
         SoundCard &card = mCardArray[cardId];
-        QMutexLocker(&card.mutex);
+
+        std::lock_guard<std::mutex> lk(card.mutex);
+
         if(card.device) {
-            return mTextCodec->toUnicode(card.device->name());
+            return card.device->name();
         }
     }
 

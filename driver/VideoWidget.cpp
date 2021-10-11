@@ -9,7 +9,7 @@
 #define VIDEO_W 1280
 #define VIDEO_H 720
 
-#define CardId 0
+#define CardId 1
 
 VideoWidget::VideoWidget(QWidget *parent)
     : QDialog(parent), videoBuffer("VideoWidget")
@@ -88,7 +88,7 @@ VideoWidget::VideoWidget(QWidget *parent)
     });
     connect(closeBtn, &QPushButton::clicked, [this](){
         decoder->stopDecoding();
-        sdlSmtAudioPlayer->clearSourceData(mSourceId);
+        smtAudioPlayer->clearSourceData(mSourceId);
         videoBuffer.clear();
     });
     connect(sizeBox, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
@@ -97,7 +97,7 @@ VideoWidget::VideoWidget(QWidget *parent)
         video->setFixedSize(size);
     });
 
-    sdlSmtAudioPlayer = SdlSmtAudioPlayer::inst();
+    smtAudioPlayer = SmtAudioPlayer::inst();
 //    SDL_AudioSpec audioSpec;
 //    audioSpec.freq = 48000;
 //    audioSpec.format = AUDIO_S16SYS;
@@ -124,7 +124,7 @@ int VideoWidget::exec()
 void VideoWidget::closeEvent(QCloseEvent *e)
 {
     decoder->stopDecoding();
-    sdlSmtAudioPlayer->clearData(0, 0);
+    smtAudioPlayer->clearData(0, 0);
 
     done(true);
 }
@@ -167,8 +167,8 @@ void VideoWidget::onShowVideoData(std::shared_ptr<MediaData> data)
 //接收音频数据
 void VideoWidget::onAudioData(std::shared_ptr<MediaData> mediaData)
 {
-    sdlSmtAudioPlayer->addData(CardId, mSourceId, mediaData.get());
-    sdlSmtAudioPlayer->setSourceOpen(mSourceId, true);
+    smtAudioPlayer->addData(CardId, mSourceId, mediaData.get());
+    smtAudioPlayer->setSourceOpen(mSourceId, true);
 }
 
 //接收视频数据

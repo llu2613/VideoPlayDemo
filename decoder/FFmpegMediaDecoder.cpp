@@ -53,7 +53,7 @@ void FFmpegMediaDecoder::setOutAudio2(int rate, int channels)
 
 void FFmpegMediaDecoder::setOutVideo2(int width, int height)
 {
-    setOutVideo(width, height, AV_PIX_FMT_YUV420P);
+    setOutVideo(AV_PIX_FMT_YUV420P, width, height);
 }
 
 void FFmpegMediaDecoder::setOutAudio(enum AVSampleFormat fmt, int rate, uint64_t ch_layout)
@@ -67,14 +67,14 @@ void FFmpegMediaDecoder::setOutAudio(enum AVSampleFormat fmt, int rate, uint64_t
     }
 }
 
-void FFmpegMediaDecoder::setOutVideo(int width, int height, enum AVPixelFormat fmt)
+void FFmpegMediaDecoder::setOutVideo(enum AVPixelFormat fmt, int width, int height)
 {
     if(pVideoCodecCtx && scaler.isVideoReady()) {
         scaler.freeVideoScale();
-        scaler.setOutVideo(width, height, fmt);
+        scaler.setOutVideo(fmt, width, height);
         scaler.initVideoScale(pVideoCodecCtx);
     } else {
-        scaler.setOutVideo(width, height, fmt);
+        scaler.setOutVideo(fmt, width, height);
     }
 }
 

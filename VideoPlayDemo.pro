@@ -72,10 +72,11 @@ SOURCES += \
     decoder/FFmpegMediaScaler.cpp \
     driver/sdl/SdlAudioPlayer.cpp \
     driver/sdl/SdlAudioDevice.cpp \
-    driver/sdl/SdlSmtAudioPlayer.cpp \
     driver/VideoBuffer.cpp \
     driver/sdl/WaveformProcessor.cpp \
-    driver/sdl/AVSynchronizer.cpp
+    driver/sdl/AVSynchronizer.cpp \
+    driver/sdl/SmtAudioPlayer.cpp \
+    driver/sdl/SdlEventDispatcher.cpp
 
 HEADERS += \
         mainwindow.h \
@@ -98,11 +99,12 @@ HEADERS += \
     driver/sdl/SdlAudioPlayer.h \
     driver/sdl/SdlAudioDevice.h \
     driver/sdl/SampleBuffer.h \
-    driver/sdl/SdlSmtAudioPlayer.h \
     driver/VideoBuffer.h \
     driver/sdl/WaveformProcessor.h \
     driver/sdl/AVSynchronizer.h \
-    driver/sdl/LockedMap.h
+    driver/sdl/LockedMap.h \
+    driver/sdl/SmtAudioPlayer.h \
+    driver/sdl/SdlEventDispatcher.h
 
 FORMS += \
         mainwindow.ui

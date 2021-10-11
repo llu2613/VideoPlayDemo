@@ -41,3 +41,5 @@ VideoPlayDemo.pro.user
 VideoPlayDemo.pro.user.*
 VideoPlayDemo.vcxproj
 VideoPlayDemo.vcxproj.*
+release*/
+ui_*
