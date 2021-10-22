@@ -1,8 +1,6 @@
 ﻿#ifndef FFMPEGSWSCALE_H
 #define FFMPEGSWSCALE_H
 
-#include <QObject>
-
 extern "C" {
 //编码
 #include "libavcodec/avcodec.h"
@@ -13,16 +11,17 @@ extern "C" {
 #include "libavutil/imgutils.h"
 }
 
-class FFmpegSwscale : public QObject
+class FFmpegSwscale
 {
-    Q_OBJECT
 public:
-    explicit FFmpegSwscale(QObject *parent = nullptr);
+    explicit FFmpegSwscale();
     ~FFmpegSwscale();
 
     int init(AVCodecContext *pCodecCtx,
                             int out_width, int out_height,
                             enum AVPixelFormat out_fmt);
+    int init(enum AVPixelFormat in_pixel_fmt, int in_width, int in_height,
+                            enum AVPixelFormat out_pixel_fmt, int out_width, int out_height);
 
     int mallocOutFrame(AVFrame **out_frame, uint8_t **out_buffer, int *out_buffer_size);
 
@@ -30,19 +29,22 @@ public:
 
     int scale(AVFrame *pFrame, int srcSliceH, AVFrame *pOutFrame);
 
+    enum AVPixelFormat inPixelFmt();
+    int inHeight();
+    int inWidth();
+
+    enum AVPixelFormat outPixelFmt();
     int outHeight();
     int outWidth();
 
 private:
     struct SwsContext *swsCtx;
 
+    int in_frame_width, in_frame_height;
     int out_frame_width, out_frame_height;
-    enum AVPixelFormat out_frame_fmt;
+    enum AVPixelFormat in_frame_fmt, out_frame_fmt;
     int out_count;
 
-signals:
-
-public slots:
 };
 
 #endif // FFMPEGSWSCALE_H

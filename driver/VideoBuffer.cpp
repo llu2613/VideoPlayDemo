@@ -118,11 +118,11 @@ void VideoBuffer::addData(MediaData *data)
         discard++;
     }
     if(discard)
-        qDebug()<<"MediaQueue discard"<<discard<<"frames,"<<mTag;
+        qDebug()<<mTag<<"MediaQueue discard"<<discard<<"frames";
 
-    if(mDataList.length()>MAX_FRAME_NUM*2/3) {
-        qDebug()<<"MediaQueue is too long, list:"<<mDataList.length();
-    }
+//    if(mDataList.length()>MAX_FRAME_NUM*2/3) {
+//        qDebug()<<"MediaQueue is too long, list:"<<mDataList.length();
+//    }
 }
 
 void VideoBuffer::clear()

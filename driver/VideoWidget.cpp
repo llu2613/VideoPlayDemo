@@ -9,14 +9,14 @@
 #define VIDEO_W 1280
 #define VIDEO_H 720
 
-#define CardId 1
+#define CardId 0
 
 VideoWidget::VideoWidget(QWidget *parent)
     : QDialog(parent), videoBuffer("VideoWidget")
 {
     setFixedSize(VIDEO_W+80, VIDEO_H+150);
 
-    decoder = new FFmpegMediaDecoder();
+    decoder = new StreamMediaDecoder();
     decoder->setOutVideo2(VIDEO_W, VIDEO_H);
 
 //    QObject::connect(decoder, &FFmpegMediaDecoder::audioData,
@@ -30,9 +30,9 @@ VideoWidget::VideoWidget(QWidget *parent)
 //    QObject::connect(&avSyncTimer, &AVSyncTimer::videoData,
 //                     this, &VideoWidget::onShowVideoData);
 
-    QObject::connect(decoder, &FFmpegMediaDecoder::audioData,
+    QObject::connect(decoder, &StreamMediaDecoder::audioData,
                      this, &VideoWidget::onAudioData);
-    QObject::connect(decoder, &FFmpegMediaDecoder::videoData,
+    QObject::connect(decoder, &StreamMediaDecoder::videoData,
                      this, &VideoWidget::onVideoData);
 
     connect(&videoBuffer, &VideoBuffer::showFrame,
@@ -69,9 +69,10 @@ VideoWidget::VideoWidget(QWidget *parent)
         sizeBox->addItem(QString("%1x%2").arg(sizeList[i].width())
                      .arg(sizeList[i].height()));
     }
-    //rtsp://admin:abc123456@192.168.1.165:554/h264/ch1/main/av_stream
+
     inputUrl->setText("http://220.161.87.62:8800/hls/0/index.m3u8");
 //    inputUrl->setText("rtsp://admin:abc123456@192.168.1.165:554/h264/ch1/main/av_stream");
+//    inputUrl->setText("rtsp://192.168.31.182/audiotracker_1");
     pHLayout->addWidget(inputUrl);
     pHLayout->addWidget(openBtn);
     pHLayout->addWidget(closeBtn);
@@ -81,13 +82,12 @@ VideoWidget::VideoWidget(QWidget *parent)
     connect(openBtn, &QPushButton::clicked, [this,inputUrl](){
         QString url = inputUrl->text();
         if(url.length()) {
-//            decoder->stopDecoding();
-            decoder->setInputUrl(url);
-            decoder->startDecoding();
+//            decoder->stopPlay();
+            decoder->startPlay(url, true);
         }
     });
     connect(closeBtn, &QPushButton::clicked, [this](){
-        decoder->stopDecoding();
+        decoder->stopPlay();
         smtAudioPlayer->clearSourceData(mSourceId);
         videoBuffer.clear();
     });
@@ -112,7 +112,7 @@ VideoWidget::VideoWidget(QWidget *parent)
 
 VideoWidget::~VideoWidget()
 {
-    decoder->stopDecoding();
+    decoder->stopPlay();
     delete decoder;
 }
 
@@ -123,8 +123,8 @@ int VideoWidget::exec()
 
 void VideoWidget::closeEvent(QCloseEvent *e)
 {
-    decoder->stopDecoding();
-    smtAudioPlayer->clearData(0, 0);
+    decoder->stopPlay();
+    smtAudioPlayer->clearData(CardId, mSourceId);
 
     done(true);
 }
@@ -167,17 +167,21 @@ void VideoWidget::onShowVideoData(std::shared_ptr<MediaData> data)
 //接收音频数据
 void VideoWidget::onAudioData(std::shared_ptr<MediaData> mediaData)
 {
-    smtAudioPlayer->addData(CardId, mSourceId, mediaData.get());
-    smtAudioPlayer->setSourceOpen(mSourceId, true);
+    if(mediaData->sample_format==AV_SAMPLE_FMT_S16) {
+        smtAudioPlayer->addData(CardId, mSourceId, mediaData.get());
+        smtAudioPlayer->setSourceOpen(mSourceId, true);
+    } else {
+        qDebug()<<"Unsupported audio format:"<<mediaData->sample_format;
+    }
 }
 
 //接收视频数据
 void VideoWidget::onVideoData(std::shared_ptr<MediaData> mediaData)
 {
-    if(mediaData->format==MediaData::VideoYUV) {
+    if(mediaData->pixel_format==AV_PIX_FMT_YUV420P) {
         videoBuffer.addData(mediaData.get());
     } else {
-        qDebug()<<"Unsupported video MediaData format:"<<mediaData->format;
+        qDebug()<<"Unsupported video format:"<<mediaData->pixel_format;
     }
 }
 

@@ -12,7 +12,7 @@
 #include "opengl/XVideoWidget.h"
 #include "model/MediaData.h"
 #include "model/MediaQueue.h"
-#include "decoder/FFmpegMediaDecoder.h"
+#include "decoder/StreamMediaDecoder.h"
 #include "driver/sdl/SmtAudioPlayer.h"
 #include "VideoBuffer.h"
 #include <memory>
@@ -38,7 +38,7 @@ private:
     YUVGLWidget *video;
     VideoBuffer videoBuffer;
 
-    FFmpegMediaDecoder *decoder;
+    StreamMediaDecoder *decoder;
 
     SmtAudioPlayer *smtAudioPlayer;
 

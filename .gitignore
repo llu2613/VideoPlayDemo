@@ -35,6 +35,8 @@
 .vs/
 debug/
 release/
+release32/
+release64/
 .qmake.stash
 *.pdb
 VideoPlayDemo.pro.user

@@ -1,14 +1,10 @@
 ﻿#ifndef FFMPEGMEDIADECODER_H
 #define FFMPEGMEDIADECODER_H
 
-#include <QObject>
-#include <QThread>
-#include <QMutex>
-#include <QSize>
+#include <mutex>
+#include <memory>
 #include "FFmpegMediaScaler.h"
 #include "model/MediaData.h"
-#include <memory>
-#include <QMetaType>
 
 extern "C" {
 //封装格式
@@ -20,79 +16,104 @@ extern "C" {
 #include "libavutil/time.h"
 }
 
-class FFmpegMediaDecoder : public QObject
+class FFmpegMediaDecoderCallback
 {
-    Q_OBJECT
 public:
-    explicit FFmpegMediaDecoder(QObject *parent = nullptr);
+    virtual void onDecodeError(int code, std::string msg)=0;
+    virtual void onAudioDataReady(std::shared_ptr<MediaData> data)=0;
+    virtual void onVideoDataReady(std::shared_ptr<MediaData> data)=0;
+};
+
+class FFmpegMediaDecoder
+{
+public:
+    enum Status{
+        Closed=0, //关闭
+        Ready,    //待取帧解码
+        Broken    //故障
+    };
+    explicit FFmpegMediaDecoder();
     ~FFmpegMediaDecoder();
 
-    void setOutAudio2(int rate, int channels);
-    void setOutVideo2(int width, int height);
-    void setOutAudio(enum AVSampleFormat fmt, int rate, uint64_t ch_layout);
+    int open(const char* input, bool hwaccels);
+    int open(const char* input, AVDictionary *dict, bool hwaccels);
+    void close();
+    int decoding();
+
+    bool isHwaccels();
+    const char* inputfile();
+    enum Status status();
+    void setTag(const char* tag);
+    const char* tag();
+
+    void setOutAudio(enum AVSampleFormat fmt, int rate, int channels);
     void setOutVideo(enum AVPixelFormat fmt, int width, int height);
 
-    void setInputUrl(QString url);
+    void getSrcAudioParams(enum AVSampleFormat *fmt, int *rate, int *channels);
+    void getOutAudioParams(enum AVSampleFormat *fmt, int *rate, int *channels);
+    void getSrcVideoParams(enum AVPixelFormat *fmt, int *width, int *height);
+    void getOutVideoParams(enum AVPixelFormat *fmt, int *width, int *height);
 
-    void startDecoding();
+    void setCallback(FFmpegMediaDecoderCallback* callback);
 
-    void stopDecoding();
+    int64_t diffLastFrame(int64_t current);
+    void setInterruptTimeout(const int microsecond);
+    const int interruptTimeout();
 
-    void test();
+    void _setStatus(Status status);
+    void _printError(int code, const char* message);
+    long readFailedCount();
 
 protected:
-    int64_t lastFrameRealtime;
+    const AVCodecContext* audioCodecContext();
+    const AVCodecContext* videoCodecContext();
+    const AVStream* audioStream();
+    const AVStream* videoStream();
+
+    virtual void printError(int code, const char* message);
+
+    virtual int audioRawFrame(AVCodecContext *pCodecCtx, AVFrame *frame, AVPacket *packet);
+    virtual int videoRawFrame(AVCodecContext *pCodecCtx, AVFrame *frame, AVPacket *packet);
+
+    virtual void audioDecodedData(AVFrame *frame, AVPacket *packet);
+    virtual void videoDecodedData(AVFrame *frame, AVPacket *packet, int pixelHeight);
+
+    virtual void audioDataReady(std::shared_ptr<MediaData> data);
+    virtual void videoDataReady(std::shared_ptr<MediaData> data);
 
 private:
     AVFormatContext* pFormatCtx;
     AVCodecContext *pAudioCodecCtx, *pVideoCodecCtx;
     int audio_stream_idx, video_stream_idx;
 
+    long readFailedCnt;
     long audioFrameCnt, videoFrameCnt;
 
     FFmpegMediaScaler scaler;
 
-    static int interruptCallback(void *pCtx);
+    std::mutex mCallbackMutex;
+    FFmpegMediaDecoderCallback *mCallback;
 
-    int open(const char* input);
-    void close();
-    void decoding();
+    //编码数据
+    AVPacket *mAVPacket;
+    //解压缩数据
+    AVFrame *mAVFrame;
+
+    int initAudioCodec(AVFormatContext *pFormatCtx, int stream_idx);
+    int initVideoCodec(AVFormatContext *pFormatCtx, int stream_idx);
+    int openCodec(AVFormatContext *pFormatCtx,
+                  int stream_idx, AVCodecContext **pCodeCtx);
 
     void printCodecInfo(AVCodecContext *pCodeCtx);
-    void printError(int code, const char* message);
+
     void print_error(const char *name, int err);
 
-    int openCodec(AVFormatContext *pFormatCtx, int stream_idx,
-                  AVCodecContext **pCodeCtx);
-    int audioFrame(AVCodecContext *pCodecCtx, AVFrame *frame, AVPacket *packet);
-    int videoFrame(AVCodecContext *pCodecCtx, AVFrame *frame, AVPacket *packet);
+    char mTag[256];
+    Status mStatus;
+    bool mIsHwaccels;
+    int64_t lastFrameRealtime;
+    int mInterruptTimeout;
 
-    QString inputUrl;
-    //线程
-    QThread *mThread;
-    QMutex mStopMutex;
-    bool mStopFlag;
-
-    //错误记录
-    QString errorMsg;
-    int errorCode;
-
-    //TEST
-    FILE *fp_pcm, *fp_yuv;
-
-signals:
-    void runDecoding();
-    //发送数据
-    void audioData(std::shared_ptr<MediaData>);
-    void videoData(std::shared_ptr<MediaData>);
-
-public slots:
-
-private slots:
-    void run();
 };
-
-//qRegisterMetaType<std::shared_ptr<MediaData>>("std::shared_ptr<MediaData>");
-Q_DECLARE_METATYPE(std::shared_ptr<MediaData>)
 
 #endif // FFMPEGMEDIADECODER_H

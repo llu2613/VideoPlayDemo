@@ -1,7 +1,6 @@
 ﻿#include "FFmpegMediaScaler.h"
-#include <QDebug>
 
-FFmpegMediaScaler::FFmpegMediaScaler(QObject *parent) : QObject(parent)
+FFmpegMediaScaler::FFmpegMediaScaler()
 {
     pAudioResamle = nullptr;
     pAudioOutBuffer = nullptr;
@@ -11,18 +10,45 @@ FFmpegMediaScaler::FFmpegMediaScaler(QObject *parent) : QObject(parent)
 
     out_audio_fmt = AV_SAMPLE_FMT_S16;
     out_audio_rate = 48000;
-    out_audio_ch = AV_CH_LAYOUT_STEREO;
+    out_audio_ch = 2;
 
     out_video_width = 1280;
     out_video_height = 720;
     out_video_fmt = AV_PIX_FMT_YUV420P;
 }
 
-enum AVPixelFormat FFmpegMediaScaler::outVideoFmt()
+FFmpegMediaScaler::~FFmpegMediaScaler()
 {
-    return out_video_fmt;
+    freeAudioResample();
+    freeVideoScale();
 }
 
+enum AVSampleFormat FFmpegMediaScaler::srcAudioFmt()
+{
+    std::lock_guard<std::recursive_mutex> lk(audioMutex);
+    if(pAudioResamle)
+        return pAudioResamle->inSampleFmt();
+    return AV_SAMPLE_FMT_NONE;
+}
+int FFmpegMediaScaler::srcAudioRate()
+{
+    std::lock_guard<std::recursive_mutex> lk(audioMutex);
+    if(pAudioResamle)
+        return pAudioResamle->inSampleRate();
+    return 0;
+}
+int FFmpegMediaScaler::srcAudioChannels()
+{
+    std::lock_guard<std::recursive_mutex> lk(audioMutex);
+    if(pAudioResamle)
+        return av_get_channel_layout_nb_channels(pAudioResamle->inChannelLayout());
+    return 0;
+}
+
+enum AVSampleFormat FFmpegMediaScaler::outAudioFmt()
+{
+    return out_audio_fmt;
+}
 int FFmpegMediaScaler::outAudioRate()
 {
     return out_audio_rate;
@@ -30,24 +56,49 @@ int FFmpegMediaScaler::outAudioRate()
 
 int FFmpegMediaScaler::outAudioChannels()
 {
-    return av_get_channel_layout_nb_channels(out_audio_ch);
+    return out_audio_ch;
 }
 
+enum AVPixelFormat FFmpegMediaScaler::srcVideoFmt()
+{
+    std::lock_guard<std::recursive_mutex> lk(videoMutex);
+    if(pVideoScale)
+        return pVideoScale->inPixelFmt();
+    return AV_PIX_FMT_NONE;
+}
+int FFmpegMediaScaler::srcVideoHeight()
+{
+    std::lock_guard<std::recursive_mutex> lk(videoMutex);
+    if(pVideoScale)
+        return pVideoScale->inHeight();
+    return 0;
+}
+int FFmpegMediaScaler::srcVideoWidth()
+{
+    std::lock_guard<std::recursive_mutex> lk(videoMutex);
+    if(pVideoScale)
+        return pVideoScale->inWidth();
+    return 0;
+}
+
+enum AVPixelFormat FFmpegMediaScaler::outVideoFmt()
+{
+    return out_video_fmt;
+}
 int FFmpegMediaScaler::outVideoHeight()
 {
     return out_video_height;
 }
-
 int FFmpegMediaScaler::outVideoWidth()
 {
     return out_video_width;
 }
 
-void FFmpegMediaScaler::setOutAudio(enum AVSampleFormat fmt, int rate, uint64_t ch_layout)
+void FFmpegMediaScaler::setOutAudio(enum AVSampleFormat fmt, int rate, int channels)
 {
     out_audio_fmt = fmt;
     out_audio_rate = rate;
-    out_audio_ch = ch_layout;
+    out_audio_ch = channels;
 }
 
 void FFmpegMediaScaler::setOutVideo(enum AVPixelFormat fmt, int width, int height)
@@ -59,25 +110,61 @@ void FFmpegMediaScaler::setOutVideo(enum AVPixelFormat fmt, int width, int heigh
 
 bool FFmpegMediaScaler::isAudioReady()
 {
-    QMutexLocker locker(&audioMutex);
+    std::lock_guard<std::recursive_mutex> lk(audioMutex);
+
     return pAudioResamle;
 }
 
 bool FFmpegMediaScaler::isVideoReady()
 {
-    QMutexLocker locker(&videoMutex);
+    std::lock_guard<std::recursive_mutex> lk(videoMutex);
+
     return pVideoScale;
+}
+
+int FFmpegMediaScaler::initAudioResample(enum AVSampleFormat in_fmt,
+                                         int in_rate, int in_channels,
+                                         enum AVSampleFormat out_fmt,
+                                         int out_rate, int out_channels)
+{
+    std::lock_guard<std::recursive_mutex> lk(audioMutex);
+
+    out_audio_fmt = out_fmt;
+    out_audio_rate = out_rate;
+    out_audio_ch = out_channels;
+
+    int ret =0;
+    const int in_ch_layout = av_get_default_channel_layout(in_channels);
+    const int out_ch_layout = av_get_default_channel_layout(out_audio_ch);
+    FFmpegSwresample *p = new FFmpegSwresample();
+    ret = p->init(in_fmt, in_rate, in_ch_layout,
+                  out_audio_fmt, out_audio_rate, out_ch_layout);
+    if(ret<0) {
+        print_error("initAudioResample", ret);
+        delete p;
+        return -1;
+    }
+    ret = p->mallocOutBuffer(&pAudioOutBuffer, &audioOutBufferSize);
+    if(ret<0) {
+        printError(-1, "申请内存失败");
+        delete p;
+        return -1;
+    }
+
+    pAudioResamle = p;
+    return 0;
 }
 
 int FFmpegMediaScaler::initAudioResample(AVCodecContext *pCodeCtx)
 {
-    QMutexLocker locker(&audioMutex);
+    std::lock_guard<std::recursive_mutex> lk(audioMutex);
 
     int ret =0;
     FFmpegSwresample *p = new FFmpegSwresample();
-    ret = p->init(pCodeCtx, out_audio_fmt, out_audio_rate, out_audio_ch);
+    ret = p->init(pCodeCtx, out_audio_fmt, out_audio_rate,
+                  av_get_default_channel_layout(out_audio_ch));
     if(ret<0) {
-        printError(-1, "初始化重采样失败");
+        print_error("initAudioResample", ret);
         delete p;
         return -1;
     }
@@ -94,13 +181,13 @@ int FFmpegMediaScaler::initAudioResample(AVCodecContext *pCodeCtx)
 
 int FFmpegMediaScaler::initVideoScale(AVCodecContext *pCodeCtx)
 {
-    QMutexLocker locker(&videoMutex);
+    std::lock_guard<std::recursive_mutex> lk(videoMutex);
 
     int ret = 0;
     FFmpegSwscale *p = new FFmpegSwscale();
     ret = p->init(pCodeCtx, out_video_width, out_video_height, out_video_fmt);
     if(ret<0) {
-        printError(-1, "初始化重缩放失败");
+        print_error("initVideoScale", ret);
         delete p;
         return -1;
     }
@@ -121,7 +208,7 @@ int FFmpegMediaScaler::initVideoScale(AVCodecContext *pCodeCtx)
 
 void FFmpegMediaScaler::freeAudioResample()
 {
-    QMutexLocker locker(&audioMutex);
+    std::lock_guard<std::recursive_mutex> lk(audioMutex);
 
     if(pAudioResamle) {
         pAudioResamle->freeOutBuffer(&pAudioOutBuffer, &audioOutBufferSize);
@@ -132,7 +219,7 @@ void FFmpegMediaScaler::freeAudioResample()
 
 void FFmpegMediaScaler::freeVideoScale()
 {
-    QMutexLocker locker(&videoMutex);
+    std::lock_guard<std::recursive_mutex> lk(videoMutex);
 
     if(pVideoScale) {
         pVideoScale->freeOutFrame(&pVideoOutFrame, &pVideoOutBuffer, &videoOutBufferSize);
@@ -141,39 +228,64 @@ void FFmpegMediaScaler::freeVideoScale()
     }
 }
 
-
-uint8_t * FFmpegMediaScaler::audioConvert(AVFrame *frame, int *out_sp, int *out_s)
+uint8_t * FFmpegMediaScaler::audioConvert(const uint8_t **in_buffer, int nb_samples,
+                                          int *out_sp, int *out_sz)
 {
-    QMutexLocker locker(&audioMutex);
+    std::lock_guard<std::recursive_mutex> lk(audioMutex);
 
     if(!pAudioResamle) {
         printError(-1, "pAudioResamle is null");
         return nullptr;
     }
 
-    int out_samples = pAudioResamle->convert(frame, pAudioOutBuffer, audioOutBufferSize);
+    int out_samples = pAudioResamle->convert(in_buffer, nb_samples,
+                                             &pAudioOutBuffer, audioOutBufferSize);
     //获取sample的size
-    int out_buffer_size = av_samples_get_buffer_size(NULL, pAudioResamle->outChannels(), out_samples,
-            pAudioResamle->outSampleFmt(), 1);
+    int out_channels = av_get_channel_layout_nb_channels(pAudioResamle->outChannelLayout());
+    int out_buffer_size = av_samples_get_buffer_size(NULL, out_channels, out_samples,
+                                                     pAudioResamle->outSampleFmt(), 1);
 
     if(out_samples) {
         *out_sp = out_samples;
-        *out_s = out_buffer_size;
+        *out_sz = out_buffer_size;
         return pAudioOutBuffer;
     }
     return nullptr;
 }
 
-AVFrame* FFmpegMediaScaler::videoScale(AVCodecContext *pCodecCtx, AVFrame *frame, int *out_h)
+uint8_t * FFmpegMediaScaler::audioConvert(AVFrame *frame, int *out_sp, int *out_sz)
 {
-    QMutexLocker locker(&videoMutex);
+    std::lock_guard<std::recursive_mutex> lk(audioMutex);
+
+    if(!pAudioResamle) {
+        printError(-1, "pAudioResamle is null");
+        return nullptr;
+    }
+
+    int out_samples = pAudioResamle->convert(frame, &pAudioOutBuffer, audioOutBufferSize);
+    //获取sample的size
+    int out_channels = av_get_channel_layout_nb_channels(pAudioResamle->outChannelLayout());
+    int out_buffer_size = av_samples_get_buffer_size(NULL, out_channels, out_samples,
+            pAudioResamle->outSampleFmt(), 1);
+
+    if(out_samples) {
+        *out_sp = out_samples;
+        *out_sz = out_buffer_size;
+        return pAudioOutBuffer;
+    }
+    return nullptr;
+}
+
+AVFrame* FFmpegMediaScaler::videoScale(int pixelHeight, AVFrame *frame, int *out_h)
+{
+    std::lock_guard<std::recursive_mutex> lk(videoMutex);
 
     if(!pVideoScale) {
         printError(-1, "pVideoScale is null");
         return nullptr;
     }
 
-    int out_height = pVideoScale->scale(frame, pCodecCtx->height, pVideoOutFrame);
+    int out_height = pVideoScale->scale(frame, pixelHeight, pVideoOutFrame);
 
     if(out_height) {
         *out_h = out_height;
@@ -184,5 +296,18 @@ AVFrame* FFmpegMediaScaler::videoScale(AVCodecContext *pCodecCtx, AVFrame *frame
 
 void FFmpegMediaScaler::printError(int code, const char* message)
 {
-    qDebug()<<QString("code:%1 msg:%2").arg(code).arg(QString::fromLocal8Bit(message));
+    printf("FFmpegMediaScaler Error code:%d msg:%s\n", code, message);
+}
+
+void FFmpegMediaScaler::print_error(const char *name, int err)
+{
+    char errbuf[200], message[256];
+    const char *errbuf_ptr = errbuf;
+
+    if (av_strerror(err, errbuf, sizeof(errbuf)) < 0)
+        errbuf_ptr = strerror(AVUNERROR(err));
+    av_log(NULL, AV_LOG_ERROR, "%s: %s\n", name, errbuf_ptr);
+
+    sprintf_s(message, sizeof(message), "(%s)%s", name, errbuf_ptr);
+    printError(err, message);
 }

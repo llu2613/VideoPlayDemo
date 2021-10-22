@@ -1,6 +1,10 @@
 #include "SdlAudioDevice.h"
 #include <memory>
 
+#define INFO(fmt,...) SDL_LogInfo(SDL_LOG_CATEGORY_AUDIO, fmt, ##__VA_ARGS__)
+#define WARNING(fmt,...) SDL_LogWarn(SDL_LOG_CATEGORY_AUDIO, fmt, ##__VA_ARGS__)
+#define ERROR(fmt,...) SDL_LogError(SDL_LOG_CATEGORY_AUDIO, fmt, ##__VA_ARGS__)
+
 #define MAX_FRAME_NUM 3000
 
 SdlAudioDevice::SdlAudioDevice(int iscapture)
@@ -38,7 +42,7 @@ int SdlAudioDevice::open(const char *device, SDL_AudioSpec spec)
             SDL_Log("We didn't get %x(got:%x) audio format.", spec.format, mObtainedSpec.format);
         }
         SDL_PauseAudioDevice(mDeviceId, 0); /* start audio playing. */
-        printf("SDL_AudioDeviceID: %d", mDeviceId);
+        INFO("SDL_AudioDeviceID: %d", mDeviceId);
         mDesiredSpec = spec;
         memccpy(mDeviceName, device, '\0', sizeof(mDeviceName));
         mState = Open;
@@ -70,7 +74,7 @@ void SdlAudioDevice::close()
     SDL_PauseAudioDevice(mDeviceId, 1);
     clearAll();
     SDL_CloseAudioDevice(mDeviceId);
-    printf("SDL_CloseAudioDevice: %d", mDeviceId);
+    INFO("SDL_CloseAudioDevice: %d", mDeviceId);
     mDeviceId = 0;
 }
 
@@ -79,7 +83,7 @@ void SdlAudioDevice::addData(int index, Uint8* buf, int len,
 {
     SampleBuffer *buffer = new SampleBuffer();
     if(!buffer->copy(buf, len)) {
-        printf("No memory allocation!");
+        WARNING("No memory allocation!");
         return;
     }
 
@@ -99,7 +103,7 @@ void SdlAudioDevice::addData(int index, Uint8* buf, int len,
             discard++;
         }
         if(discard)
-            printf("AudioCard buffer discard %d frames, %s index:%d",
+            WARNING("AudioCard buffer discard %d frames, %s index:%d",
                    discard, name(), index);
     } else {
         std::list<SampleBuffer*> list;
@@ -107,10 +111,10 @@ void SdlAudioDevice::addData(int index, Uint8* buf, int len,
         mDataMap.insert(index, list);
     }
 
-    if(mDataMap[index].size()>MAX_FRAME_NUM*2/3) {
-        printf("AudioCard buffer is too long:%s index: %d buf:%d list:%d",
-               name(), index, len, mDataMap[index].size());
-    }
+//    if(mDataMap[index].size()>MAX_FRAME_NUM*2/3) {
+//        INFO("AudioCard buffer is too long:%s index: %d buf:%d list:%d",
+//               name(), index, len, mDataMap[index].size());
+//    }
 }
 
 std::list<int> SdlAudioDevice::indexs()
@@ -154,9 +158,9 @@ int SdlAudioDevice::takeIndex(int index, Uint8 *stream, int len)
             }
             tLen += cpLen;
         }
-        if(tLen&&(tLen<len||!list.size()))
-            printf("sample buffer is too short, index: %d, (%d,%d) list:%d",
-                   index, tLen, len, list.size());
+//        if(tLen&&(tLen<len||!list.size()))
+//            INFO("sample buffer is too short, index: %d, (%d,%d) list:%d",
+//                   index, tLen, len, list.size());
         return tLen;
     }
     return 0;

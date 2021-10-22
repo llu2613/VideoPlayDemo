@@ -76,7 +76,9 @@ SOURCES += \
     driver/sdl/WaveformProcessor.cpp \
     driver/sdl/AVSynchronizer.cpp \
     driver/sdl/SmtAudioPlayer.cpp \
-    driver/sdl/SdlEventDispatcher.cpp
+    driver/sdl/SdlEventDispatcher.cpp \
+    decoder/StreamMediaDecoder.cpp \
+    common/RepeatableThread.cpp
 
 HEADERS += \
         mainwindow.h \
@@ -104,7 +106,9 @@ HEADERS += \
     driver/sdl/AVSynchronizer.h \
     driver/sdl/LockedMap.h \
     driver/sdl/SmtAudioPlayer.h \
-    driver/sdl/SdlEventDispatcher.h
+    driver/sdl/SdlEventDispatcher.h \
+    decoder/StreamMediaDecoder.h \
+    common/RepeatableThread.h
 
 FORMS += \
         mainwindow.ui

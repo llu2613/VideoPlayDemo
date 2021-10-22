@@ -2,13 +2,12 @@
 #include <QMutexLocker>
 #include <QDebug>
 
-#define BYTE4_INT(a,b,c,d) ( (0x0ff&a)<<24|(0x0ff&b)<<16|(0x0ff&c)<<8|(0x0ff&d) )
-#define BYTE2_INT(a,b) ( (0x0ff&a)<<8|(0x0ff&b) )
 
-#define AUDIO_FRAME_POINT_SIZE   8  //2^n次方
-#define BYTE_PER_SAMPLE 2  //16位采样
+#define SAMPLE_RATE 32000
 
-#define LIMIT_SHOW_SIZE  1000
+#define AUDIO_FRAME_POINT_SIZE (SAMPLE_RATE/32/5) //每秒200个点
+
+#define LIMIT_SHOW_SIZE  200
 
 WaveformProcessor::WaveformProcessor(QObject *parent) : QObject(parent)
 {
@@ -16,7 +15,13 @@ WaveformProcessor::WaveformProcessor(QObject *parent) : QObject(parent)
     moveToThread(mThread);
     connect(mThread, &QThread::finished, mThread, &QObject::deleteLater);
     connect(this, &WaveformProcessor::sigRun, this,&WaveformProcessor::run);
+
     mThread->start();
+}
+
+WaveformProcessor::~WaveformProcessor()
+{
+
 }
 
 void WaveformProcessor::addSample(int sourceId, std::shared_ptr<SampleBuffer> buffer)
@@ -24,7 +29,7 @@ void WaveformProcessor::addSample(int sourceId, std::shared_ptr<SampleBuffer> bu
     mDataMap.lock();
     if(mDataMap.contains(sourceId)) {
         mDataMap[sourceId].push_back(buffer);
-    } else{
+    } else {
         std::list<std::shared_ptr<SampleBuffer>> list;
         list.push_back(buffer);
         mDataMap.insert(sourceId, list);
@@ -73,6 +78,8 @@ void WaveformProcessor::run()
         if(mDataMap.contains(idx)
                 && mDataMap[idx].size()==0) {
             mDataMap.remove(idx);
+            if(mData16Map.contains(idx))
+                mData16Map.remove(idx);
             isEmpty = true;
         }
         mDataMap.unlock();
@@ -84,33 +91,58 @@ void WaveformProcessor::run()
             mDataMap[idx].pop_front();
             mDataMap.unlock();
 
-            addData(idx, buffer.get());
+            addData16Bits(idx, buffer.get());
+
             count++;
         }
     }
     if(count)
-        QThread::msleep(20);
+        QThread::usleep(20);
 }
 
-void WaveformProcessor::addData(int sourceId, SampleBuffer *buffer)
+void WaveformProcessor::addData16Bits(int sourceId, SampleBuffer *buffer)
 {
-    double total = 0;
-    int count = 0;
+    LockedMapLocker lk(mData16Map.mutex());
 
-    unsigned char *data = (unsigned char *)(buffer->data());
-    int dataSize = buffer->len();
-    int nChannels = buffer->channels;
-    int interval = dataSize/AUDIO_FRAME_POINT_SIZE/nChannels;
-    //显示点采用间隔段平均值的方法进行显示：不是每一个点都显示:
-    for(int i=0;i < dataSize;i=i+2*nChannels){
-        total = total + abs(*((short *)(data+i)));
-        if(count%interval == 0&&(count!=0)){
-            short avgValue=(short)(total/interval);
-            addWave(sourceId, avgValue);
-            total = 0;
-        }
-        ++count;
+    const int nChannels = buffer->channels;
+    const int step = sizeof(short)*nChannels;
+    const int minSize = step*AUDIO_FRAME_POINT_SIZE;
+
+    if(!mData16Map.contains(sourceId)) {
+        //立体声*16位样本(2B)*AUDIO_FRAME_POINT_SIZE
+        mData16Map.insert(sourceId, LoopBuffer());
+        mData16Map[sourceId].alloc(minSize*100);
+        mData16Map[sourceId].reset();
     }
+    LoopBuffer &mData16Buf = mData16Map[sourceId];
+
+    int cpLen = mData16Buf.push((unsigned char *)(buffer->data()+buffer->pos()),
+                    buffer->len()-buffer->pos());
+    buffer->setPos(buffer->pos()+cpLen);
+
+    unsigned char *buf = new unsigned char[minSize];
+    for(int n=0; n<1000; n++) {
+        if(mData16Buf.len()<minSize) {
+            break;
+        }
+        long total = 0;
+        int cp = mData16Buf.pop(buf, minSize);
+        for(int i=0; i<cp-step; i+=step) {
+            total = total + abs(*((short *)(buf+i)));
+        }
+        short avgValue=(short)(total/AUDIO_FRAME_POINT_SIZE);
+        addWave(sourceId, avgValue);
+    }
+    delete buf;
+
+    cpLen = mData16Buf.push((unsigned char *)(buffer->data()+buffer->pos()),
+                    buffer->len()-buffer->pos());
+    buffer->setPos(buffer->pos()+cpLen);
+}
+
+void WaveformProcessor::addData32Bits(int sourceId, SampleBuffer *buffer)
+{
+
 }
 
 void WaveformProcessor::addWave(int sourceId, int wave)

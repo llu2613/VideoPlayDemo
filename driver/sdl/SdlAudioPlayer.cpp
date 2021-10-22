@@ -1,6 +1,10 @@
 #include "SdlAudioPlayer.h"
 #include <string.h>
 
+#define INFO(fmt,...) SDL_LogInfo(SDL_LOG_CATEGORY_AUDIO, fmt, ##__VA_ARGS__)
+#define WARNING(fmt,...) SDL_LogWarn(SDL_LOG_CATEGORY_AUDIO, fmt, ##__VA_ARGS__)
+#define ERROR(fmt,...) SDL_LogError(SDL_LOG_CATEGORY_AUDIO, fmt, ##__VA_ARGS__)
+
 #define SUB_SYSTEM (SDL_INIT_AUDIO|SDL_INIT_TIMER)
 
 //初始化
@@ -14,7 +18,7 @@ void SdlAudioPlayer::audioCallback(void *data, Uint8 *stream, int len)
     SoundCard *card = static_cast<SoundCard*>(data);
 
     if(!card) {
-        printf("sdl_audio_callback *data is broken!");
+        ERROR("sdl_audio_callback *data is broken!");
         return;
     }
 
@@ -79,11 +83,9 @@ bool SdlAudioPlayer::initAudioSystem()
 
     /* Load the SDL library */
     if (SDL_InitSubSystem(SUB_SYSTEM) < 0) {
-        printf("Couldn't initialize SDL: %s\n", SDL_GetError());
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't initialize SDL: %s\n", SDL_GetError());
         return false;
     } else{
-        printf("init SDL success.\n");
         mIsInitSys = true;
         /* Enable standard application logging */
         SDL_LogSetPriority(SDL_LOG_CATEGORY_APPLICATION, SDL_LOG_PRIORITY_INFO);
@@ -104,7 +106,7 @@ void SdlAudioPlayer::addData(int cardId, int sourceId, Uint8 *buf, int bufLen,
 {
     if(cardId>=0&&cardId<MAX_CARD_NUM) {
     } else {
-        printf("Invalid sound card id:%d", cardId);
+        WARNING("Invalid sound card id:%d", cardId);
         return;
     }
 
@@ -116,10 +118,10 @@ void SdlAudioPlayer::addData(int cardId, int sourceId, Uint8 *buf, int bufLen,
             card.device->addData(sourceId, buf, bufLen, timestamp);
             card.device->resume();
         } else {
-            printf("Sound card is not initiailizing, cardId:%d", cardId);
+            WARNING("Sound card is not initiailizing, cardId:%d", cardId);
         }
     } else {
-        printf("SoundCard %d is disable!", cardId);
+        WARNING("SoundCard %d is disable!", cardId);
     }
     card.mutex.unlock();
 }
@@ -128,7 +130,7 @@ void SdlAudioPlayer::clearData(int cardId, int sourceId)
 {
     if(cardId>=0&&cardId<MAX_CARD_NUM) {
     } else {
-        printf("Invalid sound card id:%d", cardId);
+        WARNING("Invalid sound card id:%d", cardId);
         return;
     }
 
@@ -138,7 +140,7 @@ void SdlAudioPlayer::clearData(int cardId, int sourceId)
     if(card.device) {
         card.device->clear(sourceId);
     } else {
-        printf("Sound card is not initiailizing, cardId:%d", cardId);
+        INFO("Sound card is not initiailizing, cardId:%d", cardId);
     }
     card.mutex.unlock();
 }
@@ -147,7 +149,7 @@ void SdlAudioPlayer::clearCardData(int cardId)
 {
     if(cardId>=0&&cardId<MAX_CARD_NUM) {
     } else {
-        printf("Invalid sound card id:%d", cardId);
+        WARNING("Invalid sound card id:%d", cardId);
         return;
     }
 
@@ -157,7 +159,7 @@ void SdlAudioPlayer::clearCardData(int cardId)
     if(card.device) {
         card.device->clearAll();
     } else {
-        printf("Sound card is not initiailizing, cardId:%d", cardId);
+        INFO("Sound card is not initiailizing, cardId:%d", cardId);
     }
     card.mutex.unlock();
 }
@@ -214,7 +216,7 @@ int SdlAudioPlayer::openCard(std::string name, SDL_AudioSpec wanted)
         SoundCard &card = mCardArray[findIndex];
         card.mutex.lock();
         if(card.device && card.device->isOpened()) {
-            printf("SoundCard %s had been opened!", name);
+            INFO("SoundCard %s had been opened!", name);
             return findIndex;
         }
         card.mutex.unlock();
@@ -230,7 +232,7 @@ int SdlAudioPlayer::openCard(std::string name, SDL_AudioSpec wanted)
             int ret = card.device->open(name_c, wanted)>0;
             card.enable = ret>0;
             card.name = name;
-            printf("openCard: %s, cardId: %d", name, findIndex);
+            INFO("openCard: %s, cardId: %d", name, findIndex);
         }
         card.mutex.unlock();
         return findIndex;
@@ -244,7 +246,7 @@ int SdlAudioPlayer::openCard(std::string name, SDL_AudioSpec wanted)
             int ret = card.device->open(name_c, wanted)>0;
             card.enable = ret>0;
             card.name = name;
-            printf("openCard: %s, cardId: %d", name, emptyIndex);
+            INFO("openCard: %s, cardId: %d", name, emptyIndex);
         }
         card.mutex.unlock();
 
@@ -258,7 +260,7 @@ void SdlAudioPlayer::pauseCard(int cardId, int ispause)
 {
     if(cardId>=0&&cardId<MAX_CARD_NUM) {
     } else {
-        printf("Invalid sound card id:%d", cardId);
+        WARNING("Invalid sound card id:%d", cardId);
         return;
     }
 
@@ -277,7 +279,7 @@ void SdlAudioPlayer::closeCard(int cardId)
 {
     if(cardId>=0&&cardId<MAX_CARD_NUM) {
     } else {
-        printf("Invalid sound card id:%d", cardId);
+        WARNING("Invalid sound card id:%d", cardId);
         return;
     }
 
@@ -296,7 +298,7 @@ int SdlAudioPlayer::bufferSize(int cardId, int sourceId)
 {
     if(cardId>=0&&cardId<MAX_CARD_NUM) {
     } else {
-        printf("Invalid sound card id:%d", cardId);
+        WARNING("Invalid sound card id:%d", cardId);
         return 0;
     }
 
@@ -308,7 +310,7 @@ int SdlAudioPlayer::bufferSize(int cardId, int sourceId)
     if(card.device) {
         size = card.device->bufferSize(sourceId);
     } else {
-        printf("Sound card is not initiailizing, cardId:%d", cardId);
+        INFO("Sound card is not initiailizing, cardId:%d", cardId);
     }
     card.mutex.unlock();
 

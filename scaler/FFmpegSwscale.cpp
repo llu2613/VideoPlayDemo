@@ -1,8 +1,6 @@
 ﻿#include "FFmpegSwscale.h"
 
-
-
-FFmpegSwscale::FFmpegSwscale(QObject *parent) : QObject(parent)
+FFmpegSwscale::FFmpegSwscale()
 {
     swsCtx = nullptr;
 }
@@ -17,20 +15,28 @@ int FFmpegSwscale::init(AVCodecContext *pCodecCtx,
                         int out_width, int out_height,
                         enum AVPixelFormat out_fmt)
 {
+    return init(pCodecCtx->pix_fmt,pCodecCtx->width,pCodecCtx->height,
+                out_fmt,out_width,out_height);
+}
+
+int FFmpegSwscale::init(enum AVPixelFormat in_pixel_fmt, int in_width, int in_height,
+                        enum AVPixelFormat out_pixel_fmt, int out_width, int out_height)
+{
     out_frame_width = out_width;
     out_frame_height = out_height;
-    out_frame_fmt = out_fmt;
+    out_frame_fmt = out_pixel_fmt;
 
-    swsCtx = sws_getContext(pCodecCtx->width,pCodecCtx->height,pCodecCtx->pix_fmt,
-                                                out_width, out_height, out_fmt,
-                                                SWS_BICUBIC, NULL, NULL, NULL);
+    swsCtx = sws_getContext(in_width,in_height,in_pixel_fmt,
+                            out_width, out_height, out_pixel_fmt,
+                            SWS_BICUBIC, NULL, NULL, NULL);
     if(!swsCtx) {
         printf("swr_init failed");
         return -1;
     }
 
     //新数据长度
-    out_count = avpicture_get_size(out_frame_fmt, out_frame_width, out_frame_height);
+    //out_count = avpicture_get_size(out_frame_fmt, out_frame_width, out_frame_height);
+    out_count = av_image_get_buffer_size(out_frame_fmt, out_frame_width, out_frame_height, 1);
 
     return 0;
 }
@@ -88,11 +94,27 @@ int FFmpegSwscale::scale(AVFrame *pFrame, int srcSliceH, AVFrame *pOutFrame)
     return out_height;
 }
 
+enum AVPixelFormat FFmpegSwscale::inPixelFmt()
+{
+    return in_frame_fmt;
+}
+int FFmpegSwscale::inHeight()
+{
+    return in_frame_height;
+}
+int FFmpegSwscale::inWidth()
+{
+    return in_frame_width;
+}
+
+enum AVPixelFormat FFmpegSwscale::outPixelFmt()
+{
+    return out_frame_fmt;
+}
 int FFmpegSwscale::outHeight()
 {
     return out_frame_height;
 }
-
 int FFmpegSwscale::outWidth()
 {
     return out_frame_width;
