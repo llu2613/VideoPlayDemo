@@ -4,7 +4,8 @@
 #include <QDebug>
 
 #define DEFAULT_FRAME_RATE  25
-#define MAX_FRAME_NUM    1000
+#define MAX_FRAME_NUM    2000
+#define MAX_FRAME_MEM    (200*1000*1000)
 
 /**
  * 【Android FFMPEG 开发】FFMPEG 音视频同步
@@ -14,8 +15,9 @@
 VideoBuffer::VideoBuffer(QString tag, QObject *parent)
     : QThread(parent)
 {
-    mFrameRate = DEFAULT_FRAME_RATE;
     mSync = nullptr;
+    mFrameRate = DEFAULT_FRAME_RATE;
+    mMemorySize = 0;
 
     mTag = tag;
 }
@@ -64,6 +66,7 @@ void VideoBuffer::run()
 
                 for(int i=0;playUs && abs((long long)(playUs-elapsedUs))>limitUs
                     && i<2 && mDataList.length();i++) {
+                    mMemorySize -= calcMemorySize(data);
                     data->release();
                     delete data;
                     playUs += durUs;
@@ -78,8 +81,14 @@ void VideoBuffer::run()
             playUs += durUs;
 
             if(data) {
+                mSyncMutex.lock();
+                if(mSync) {
+                    mSync->setVideoPlayingTs(data->pts, data->time_base_d);
+                }
+                mSyncMutex.unlock();
                 std::shared_ptr<MediaData> mediaData(data);
                 showFrame(mediaData);
+                mMemorySize -= calcMemorySize(mediaData.get());
             } else {
                 qDebug()<<"mediaData is null";
             }
@@ -110,19 +119,19 @@ void VideoBuffer::addData(MediaData *data)
     copyData->copy(*data);
     mDataList.append(copyData);
 
+    mMemorySize += calcMemorySize(copyData);
+
     int discard = 0;
-    for(int i=mDataList.length(); i>MAX_FRAME_NUM; i--) {
+    for(int i=mDataList.length(); i>MAX_FRAME_NUM
+        ||mMemorySize>MAX_FRAME_MEM; i--) {
         MediaData* data = mDataList.takeFirst();
+        mMemorySize -= calcMemorySize(copyData);
         data->release();
         delete data;
         discard++;
     }
     if(discard)
-        qDebug()<<mTag<<"MediaQueue discard"<<discard<<"frames";
-
-//    if(mDataList.length()>MAX_FRAME_NUM*2/3) {
-//        qDebug()<<"MediaQueue is too long, list:"<<mDataList.length();
-//    }
+        qDebug()<<mTag<<"MediaQueue over, discard"<<discard<<"frames";
 }
 
 void VideoBuffer::clear()
@@ -134,4 +143,15 @@ void VideoBuffer::clear()
         delete data;
     }
     mDataMutex.unlock();
+}
+
+long VideoBuffer::calcMemorySize(MediaData *data)
+{
+    long total = 0;
+    for(int i=0; i<MAX_DATA_ARRAY; i++) {
+        if(data->data[i]) {
+            total += data->datasize[i];
+        }
+    }
+    return total;
 }

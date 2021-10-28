@@ -57,6 +57,7 @@ SOURCES += \
         mainwindow.cpp \
     encoder/FFmpegFileEncoder.cpp \
     decoder/FFmpegMediaDecoder.cpp \
+    decoder/AVSynchronizer.cpp \
     scaler/FFmpegSwscale.cpp \
     scaler/FFmpegSwresample.cpp \
     driver/opengl/OpenGLWidget.cpp \
@@ -74,16 +75,17 @@ SOURCES += \
     driver/sdl/SdlAudioDevice.cpp \
     driver/VideoBuffer.cpp \
     driver/sdl/WaveformProcessor.cpp \
-    driver/sdl/AVSynchronizer.cpp \
     driver/sdl/SmtAudioPlayer.cpp \
     driver/sdl/SdlEventDispatcher.cpp \
     decoder/StreamMediaDecoder.cpp \
-    common/RepeatableThread.cpp
+    common/RepeatableThread.cpp \
+    decoder/FFAvioContextHandle.cpp
 
 HEADERS += \
         mainwindow.h \
     encoder/FFmpegFileEncoder.h \
     decoder/FFmpegMediaDecoder.h \
+    decoder/AVSynchronizer.h \
     scaler/FFmpegSwscale.h \
     scaler/FFmpegSwresample.h \
     driver/opengl/OpenGLWidget.h \
@@ -103,12 +105,12 @@ HEADERS += \
     driver/sdl/SampleBuffer.h \
     driver/VideoBuffer.h \
     driver/sdl/WaveformProcessor.h \
-    driver/sdl/AVSynchronizer.h \
     driver/sdl/LockedMap.h \
     driver/sdl/SmtAudioPlayer.h \
     driver/sdl/SdlEventDispatcher.h \
     decoder/StreamMediaDecoder.h \
-    common/RepeatableThread.h
+    common/RepeatableThread.h \
+    decoder/FFAvioContextHandle.h
 
 FORMS += \
         mainwindow.ui

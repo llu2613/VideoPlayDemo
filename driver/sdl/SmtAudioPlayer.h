@@ -5,7 +5,7 @@
 #include <QTextCodec>
 #include "SdlAudioPlayer.h"
 #include "WaveformProcessor.h"
-#include "AVSynchronizer.h"
+#include "decoder/AVSynchronizer.h"
 #include "SdlEventDispatcher.h"
 #include "model/MediaData.h"
 

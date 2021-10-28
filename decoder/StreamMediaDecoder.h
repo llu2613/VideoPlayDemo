@@ -7,6 +7,7 @@
 #include <memory>
 #include "FFmpegMediaDecoder.h"
 #include "common/RepeatableThread.h"
+#include "AVSynchronizer.h"
 
 class StreamMediaDecoder : public QObject,
         protected FFmpegMediaDecoderCallback,
@@ -19,6 +20,7 @@ public:
 
     void setOutAudio2(int rate, int channels);
     void setOutVideo2(int width, int height);
+    AVSynchronizer* getSynchronizer();
 
     void setInputUrl();
 
@@ -39,6 +41,8 @@ private:
     RepeatableThread mThread;
     QMutex mStopMutex;
     bool mStopFlag;
+    AVSynchronizer *syncer;
+    double audio_ts, video_ts;
 
     QString mInputUrl;
     bool mIsHwaccels;

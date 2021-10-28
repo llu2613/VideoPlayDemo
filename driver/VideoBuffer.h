@@ -5,7 +5,7 @@
 #include <QList>
 #include <QMutex>
 #include "model/MediaData.h"
-#include "driver/sdl/AVSynchronizer.h"
+#include "decoder/AVSynchronizer.h"
 #include <memory>
 
 class VideoBuffer : public QThread
@@ -25,12 +25,15 @@ private:
     int mFrameRate;
     QMutex mDataMutex;
     QList<MediaData*> mDataList;
+    long mMemorySize;
 
     QMutex mSyncMutex;
     AVSynchronizer *mSync;
 
     bool isThRunning;
     void run();
+
+    long calcMemorySize(MediaData *data);
 
 signals:
     void showFrame(std::shared_ptr<MediaData> data);

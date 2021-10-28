@@ -30,7 +30,8 @@ public:
     enum Status{
         Closed=0, //关闭
         Ready,    //待取帧解码
-        Broken    //故障
+        Broken,    //故障
+        EndOfFile  //结束
     };
     explicit FFmpegMediaDecoder();
     ~FFmpegMediaDecoder();

@@ -1,7 +1,9 @@
 #include "SdlAudioPlayer.h"
 #include <string.h>
+#include <QDebug>
 
-#define INFO(fmt,...) SDL_LogInfo(SDL_LOG_CATEGORY_AUDIO, fmt, ##__VA_ARGS__)
+#define INFO(fmt,...) qDebug(fmt, ##__VA_ARGS__)
+//#define INFO(fmt,...) SDL_LogInfo(SDL_LOG_CATEGORY_AUDIO, fmt, ##__VA_ARGS__)
 #define WARNING(fmt,...) SDL_LogWarn(SDL_LOG_CATEGORY_AUDIO, fmt, ##__VA_ARGS__)
 #define ERROR(fmt,...) SDL_LogError(SDL_LOG_CATEGORY_AUDIO, fmt, ##__VA_ARGS__)
 
@@ -181,7 +183,8 @@ int SdlAudioPlayer::openCard(
             int freq,
             SDL_AudioFormat format,
             Uint8 channels,
-            Uint16 samples)
+            Uint16 samples,
+            int maxMemory)
 {
     SDL_AudioSpec wanted;
     SDL_zero(wanted);
@@ -190,10 +193,12 @@ int SdlAudioPlayer::openCard(
     wanted.channels = channels;
     wanted.samples = samples;
 
-    return openCard(name, wanted);
+    return openCard(name, wanted, maxMemory);
 }
 
-int SdlAudioPlayer::openCard(std::string name, SDL_AudioSpec wanted)
+int SdlAudioPlayer::openCard(std::string name,
+                             SDL_AudioSpec wanted,
+                             int maxMemory)
 {
     const char* name_c = name.c_str();
     //找卡
@@ -220,10 +225,18 @@ int SdlAudioPlayer::openCard(std::string name, SDL_AudioSpec wanted)
             return findIndex;
         }
         card.mutex.unlock();
+    } else if(emptyIndex!=-1) {
+        SoundCard &card = mCardArray[emptyIndex];
+        card.mutex.lock();
+        if(!card.device) {
+            card.device = new SdlAudioDevice(SDL_FALSE);
+        }
+        card.mutex.unlock();
     }
 
-    if(findIndex!=-1) {
-        SoundCard &card = mCardArray[findIndex];
+    int willIndex = findIndex!=-1?findIndex:emptyIndex;
+    if(willIndex!=-1) {
+        SoundCard &card = mCardArray[willIndex];
         card.mutex.lock();
         if(card.device) {
             wanted.callback = SdlAudioPlayer::audioCallback;
@@ -232,25 +245,11 @@ int SdlAudioPlayer::openCard(std::string name, SDL_AudioSpec wanted)
             int ret = card.device->open(name_c, wanted)>0;
             card.enable = ret>0;
             card.name = name;
-            INFO("openCard: %s, cardId: %d", name, findIndex);
+            card.device->setMaxMemory(maxMemory);
+            INFO("openCard: %s, cardId: %d", name, willIndex);
         }
         card.mutex.unlock();
-        return findIndex;
-    } else if(emptyIndex!=-1) {
-        SoundCard &card = mCardArray[emptyIndex];
-        card.mutex.lock();
-        card.device = new SdlAudioDevice(SDL_FALSE);
-        if(card.device) {
-            wanted.callback = SdlAudioPlayer::audioCallback;
-            wanted.userdata = &card;
-            int ret = card.device->open(name_c, wanted)>0;
-            card.enable = ret>0;
-            card.name = name;
-            INFO("openCard: %s, cardId: %d", name, emptyIndex);
-        }
-        card.mutex.unlock();
-
-        return emptyIndex;
+        return willIndex;
     }
 
     return -1;

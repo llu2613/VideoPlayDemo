@@ -14,6 +14,7 @@
 VideoWidget::VideoWidget(QWidget *parent)
     : QDialog(parent), videoBuffer("VideoWidget")
 {
+    mSourceId = 0;
     setFixedSize(VIDEO_W+80, VIDEO_H+150);
 
     decoder = new StreamMediaDecoder();
@@ -37,6 +38,7 @@ VideoWidget::VideoWidget(QWidget *parent)
 
     connect(&videoBuffer, &VideoBuffer::showFrame,
             this, &VideoWidget::onShowVideoData);
+    videoBuffer.setSync(decoder->getSynchronizer());
     videoBuffer.start();
 
     sizeList<<QSize(1920,1080)<<QSize(1280,720)<<QSize(640,480)
@@ -71,6 +73,8 @@ VideoWidget::VideoWidget(QWidget *parent)
     }
 
     inputUrl->setText("http://220.161.87.62:8800/hls/0/index.m3u8");
+//    inputUrl->setText("http://192.168.31.233:9080/m3u8file/A02C237E-E644-41E5-B90F-5E6C7AB616CF1885.m3u8");
+//    inputUrl->setText("http://192.168.31.233:9000/devrecorda02c237ee64441e5b90f5e6c7ab616cf1/19700101084735036-1-3-A02C237E-E644-41E5-B90F-5E6C7AB616CF-0100811318.ts");
 //    inputUrl->setText("rtsp://admin:abc123456@192.168.1.165:554/h264/ch1/main/av_stream");
 //    inputUrl->setText("rtsp://192.168.31.182/audiotracker_1");
     pHLayout->addWidget(inputUrl);
@@ -107,7 +111,7 @@ VideoWidget::VideoWidget(QWidget *parent)
 //    const char* name = SDL_GetAudioDeviceName(1, 0);
 //    sdlSmtAudioPlayer->openCard(name, audioSpec);
 
-    mSourceId = 0;
+    smtAudioPlayer->setSync(mSourceId, decoder->getSynchronizer());
 }
 
 VideoWidget::~VideoWidget()

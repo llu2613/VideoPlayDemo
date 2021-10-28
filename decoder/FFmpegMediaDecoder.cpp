@@ -1,6 +1,9 @@
 ﻿#include "FFmpegMediaDecoder.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <QDebug>
+
+#define LOG(...) qDebug(__VA_ARGS__)
 
 //20s超时退出
 #define INTERRUPT_TIMEOUT (10 * 1000 * 1000)
@@ -188,20 +191,25 @@ void FFmpegMediaDecoder::audioDecodedData(AVFrame *frame, AVPacket *packet)
 //        if(fp_pcm) {
 //            fwrite(pAudioOutBuffer, 1, out_buffer_size, fp_pcm);
 //        }
-    std::shared_ptr<MediaData> mediaData(new MediaData);
-    mediaData->sample_format = scaler.outAudioFmt();
-    mediaData->nb_samples = out_samples;
-    mediaData->sample_rate = scaler.outAudioRate();
-    mediaData->channels = scaler.outAudioChannels();
-    mediaData->pts = packet->pts;
-    mediaData->duration = packet->duration;
-    AVStream *stream = pFormatCtx->streams[packet->stream_index];
-    mediaData->time_base_d = av_q2d(stream->time_base);
-    //帧数据
-    mediaData->data[0] = new unsigned char[out_buffer_size];
-    mediaData->datasize[0] = out_buffer_size;
-    memcpy(mediaData->data[0], pAudioOutBuffer, out_buffer_size);
-    audioDataReady(mediaData);
+
+    try {
+        std::shared_ptr<MediaData> mediaData(new MediaData);
+        mediaData->sample_format = scaler.outAudioFmt();
+        mediaData->nb_samples = out_samples;
+        mediaData->sample_rate = scaler.outAudioRate();
+        mediaData->channels = scaler.outAudioChannels();
+        mediaData->pts = packet->pts;
+        mediaData->duration = packet->duration;
+        AVStream *stream = pFormatCtx->streams[packet->stream_index];
+        mediaData->time_base_d = av_q2d(stream->time_base);
+        //帧数据
+        mediaData->data[0] = new unsigned char[out_buffer_size];
+        mediaData->datasize[0] = out_buffer_size;
+        memcpy(mediaData->data[0], pAudioOutBuffer, out_buffer_size);
+        audioDataReady(mediaData);
+    } catch(...) {
+        LOG("audioDecodedData failed share data!");
+    }
 }
 
 void FFmpegMediaDecoder::videoDecodedData(AVFrame *frame, AVPacket *packet, int pixelHeight)
@@ -226,30 +234,35 @@ void FFmpegMediaDecoder::videoDecodedData(AVFrame *frame, AVPacket *packet, int 
 //            fwrite(pFrameYUV->data[1], 1, y_size / 4, fp_yuv);
 //            fwrite(pFrameYUV->data[2], 1, y_size / 4, fp_yuv);
 //        }
-    std::shared_ptr<MediaData> mediaData(new MediaData);
-    mediaData->pixel_format = scaler.outVideoFmt();
-    mediaData->width = scaler.outVideoWidth();
-    mediaData->height = out_height;
-    mediaData->pts = packet->pts;
-    mediaData->duration = packet->duration;
-    mediaData->timestamp = frame->best_effort_timestamp;
-    mediaData->repeat_pict = frame->repeat_pict; //重复显示次数
-    mediaData->key_frame = (frame->key_frame==1||frame->pict_type==AV_PICTURE_TYPE_I);
-    AVStream *stream = pFormatCtx->streams[packet->stream_index];
-    mediaData->time_base_d = av_q2d(stream->time_base);
-    mediaData->frame_rate = av_q2d(stream->avg_frame_rate);
-    //一帧图像（音频）的时间戳（时间戳一般以第一帧为0开始）
-    //时间戳 = pts * (AVRational.num/AVRational.den)
-    //int second= pFrame->pts * av_q2d(stream->time_base);
-    int y_size = scaler.outVideoWidth() * out_height;
-    int dataSize[] = {y_size, y_size / 4, y_size / 4};
-    for(int i=0; i<3; i++) {
-        mediaData->data[i] = new unsigned char[dataSize[i]];
-        mediaData->datasize[i] = dataSize[i];
-        mediaData->linesize[i] = pFrameYUV->linesize[i];
-        memcpy(mediaData->data[i], pFrameYUV->data[i], dataSize[i]);
+
+    try {
+        std::shared_ptr<MediaData> mediaData(new MediaData);
+        mediaData->pixel_format = scaler.outVideoFmt();
+        mediaData->width = scaler.outVideoWidth();
+        mediaData->height = out_height;
+        mediaData->pts = packet->pts;
+        mediaData->duration = packet->duration;
+        mediaData->repeat_pict = frame->repeat_pict; //重复显示次数
+        mediaData->best_timestamp = frame->best_effort_timestamp;
+        mediaData->key_frame = (frame->key_frame==1||frame->pict_type==AV_PICTURE_TYPE_I);
+        AVStream *stream = pFormatCtx->streams[packet->stream_index];
+        mediaData->time_base_d = av_q2d(stream->time_base);
+        mediaData->frame_rate = av_q2d(stream->avg_frame_rate);
+        //一帧图像（音频）的时间戳（时间戳一般以第一帧为0开始）
+        //时间戳 = pts * (AVRational.num/AVRational.den)
+        //int second= pFrame->pts * av_q2d(stream->time_base);
+        int y_size = scaler.outVideoWidth() * out_height;
+        int dataSize[] = {y_size, y_size / 4, y_size / 4};
+        for(int i=0; i<3; i++) {
+            mediaData->data[i] = new unsigned char[dataSize[i]];
+            mediaData->datasize[i] = dataSize[i];
+            mediaData->linesize[i] = pFrameYUV->linesize[i];
+            memcpy(mediaData->data[i], pFrameYUV->data[i], dataSize[i]);
+        }
+        videoDataReady(mediaData);
+    } catch(...) {
+        LOG("videoDecodedData failed share data!");
     }
-    videoDataReady(mediaData);
 }
 
 void FFmpegMediaDecoder::audioDataReady(std::shared_ptr<MediaData> data)
@@ -454,6 +467,10 @@ int FFmpegMediaDecoder::decoding()
     int readRet = 0;
     readRet = av_read_frame(pFormatCtx, mAVPacket);
     if(readRet < 0) {
+        if(AVERROR_EOF==readRet) {
+            mStatus = EndOfFile;
+            return readRet;
+        }
         readFailedCnt++;
         print_error("av_read_frame", readRet);
         return readRet;
@@ -564,24 +581,24 @@ void FFmpegMediaDecoder::printCodecInfo(AVCodecContext *pCodeCtx)
     if(pCodeCtx->codec_type==AVMEDIA_TYPE_AUDIO) {
         //输出音频信息
         AVCodec *pCodec = avcodec_find_decoder(pCodeCtx->codec_id);
-        printf("audio file format: %s",pFormatCtx->iformat->name);
-        printf("audio duration: %d", (pFormatCtx->duration)/1000000);
-        printf("audio channels: (lt:%d) %d", pCodeCtx->channel_layout, pCodeCtx->channels);
-        printf("audio sample rate: %d",pCodeCtx->sample_rate);
-        printf("audio sample accuracy: (fmt:%d) %d",pCodeCtx->sample_fmt,
+        LOG("audio file format: %s",pFormatCtx->iformat->name);
+        LOG("audio duration: %d", (pFormatCtx->duration)/1000000);
+        LOG("audio channels: (lt:%d) %d", pCodeCtx->channel_layout, pCodeCtx->channels);
+        LOG("audio sample rate: %d",pCodeCtx->sample_rate);
+        LOG("audio sample accuracy: (fmt:%d) %d",pCodeCtx->sample_fmt,
                av_get_bytes_per_sample(pCodeCtx->sample_fmt)<<3);
-        printf("audio bit rate: %d",pCodeCtx->bit_rate);
+        LOG("audio bit rate: %d",pCodeCtx->bit_rate);
         if(pCodec)
-            printf("audio decode name: %s", pCodec->name);
+            LOG("audio decode name: %s", pCodec->name);
     } else if(pCodeCtx->codec_type==AVMEDIA_TYPE_VIDEO) {
         //输出视频信息
         AVCodec *pCodec = avcodec_find_decoder(pCodeCtx->codec_id);
-        printf("video file format: %s",pFormatCtx->iformat->name);
-        printf("video duration: %d", (pFormatCtx->duration)/1000000);
-        printf("video frame pixel format: %d", pCodeCtx->pix_fmt);
-        printf("video frame size: %d,%d",pCodeCtx->width, pCodeCtx->height);
+        LOG("video file format: %s",pFormatCtx->iformat->name);
+        LOG("video duration: %d", (pFormatCtx->duration)/1000000);
+        LOG("video frame pixel format: %d", pCodeCtx->pix_fmt);
+        LOG("video frame size: %d,%d",pCodeCtx->width, pCodeCtx->height);
         if(pCodec)
-            printf("video decode name: %s", pCodec->name);
+            LOG("video decode name: %s", pCodec->name);
     }
 }
 

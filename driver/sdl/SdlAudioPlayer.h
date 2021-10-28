@@ -44,8 +44,8 @@ public:
                  int freq,
                  SDL_AudioFormat format,
                  Uint8 channels,
-                 Uint16 samples);
-    int openCard(std::string name, SDL_AudioSpec wanted);
+                 Uint16 samples, int maxMemory);
+    int openCard(std::string name, SDL_AudioSpec wanted, int maxMemory);
     void pauseCard(int cardId, int ispause);
     void closeCard(int cardId);
     void addData(int cardId, int sourceId, Uint8 *buf, int bufLen, double timestamp);

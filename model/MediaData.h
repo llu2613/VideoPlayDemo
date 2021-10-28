@@ -21,7 +21,6 @@ public:
 
     int64_t pts;
     int64_t duration;
-    int64_t timestamp;
     double time_base_d;
     //audio
     int sample_format;
@@ -35,6 +34,7 @@ public:
     int repeat_pict;
     int frame_rate;
     int key_frame;
+    int64_t best_timestamp;
 
 };
 

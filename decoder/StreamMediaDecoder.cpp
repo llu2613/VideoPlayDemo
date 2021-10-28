@@ -13,11 +13,12 @@ StreamMediaDecoder::StreamMediaDecoder(QObject *parent)
     //avformat_network_init();
 
     mediaDecoder.setCallback(this);
+    syncer = new AVSynchronizer;
 }
 
 StreamMediaDecoder::~StreamMediaDecoder()
 {
-
+    delete syncer;
 }
 
 void StreamMediaDecoder::setOutAudio2(int rate, int channels)
@@ -32,6 +33,11 @@ void StreamMediaDecoder::setOutVideo2(int width, int height)
     enum AVPixelFormat fmt;
     mediaDecoder.getOutVideoParams(&fmt, NULL, NULL);
     mediaDecoder.setOutVideo(fmt, width, height);
+}
+
+AVSynchronizer* StreamMediaDecoder::getSynchronizer()
+{
+    return syncer;
 }
 
 void StreamMediaDecoder::startPlay(QString url, bool isHwaccels)
@@ -56,11 +62,19 @@ void StreamMediaDecoder::onDecodeError(int code, std::string msg)
 
 void StreamMediaDecoder::onAudioDataReady(std::shared_ptr<MediaData> data)
 {
+    audio_ts = data->pts*data->time_base_d;
+    if(audio_ts>video_ts) {
+        syncer->setDecodingTs(audio_ts);
+    }
     emit audioData(data);
 }
 
 void StreamMediaDecoder::onVideoDataReady(std::shared_ptr<MediaData> data)
 {
+    video_ts = data->pts*data->time_base_d;
+    if(audio_ts<video_ts) {
+        syncer->setDecodingTs(video_ts);
+    }
     emit videoData(data);
 }
 
@@ -79,6 +93,11 @@ void StreamMediaDecoder::run()
     qDebug()<<"----start-decoding----";
 
     int retCode = 0;
+
+    audio_ts = 0;
+    video_ts = 0;
+    syncer->reset();
+
     retCode = mediaDecoder.open(url, mIsHwaccels);
 
     bool isDecoding = true;
@@ -99,6 +118,21 @@ void StreamMediaDecoder::run()
         if(retCode<0) {
             if(mediaDecoder.status()==FFmpegMediaDecoder::Broken
                     ||mediaDecoder.readFailedCount()>10) {
+                break;
+            }
+        }
+
+        for(int i=0; isDecoding&&i<20; i++) {
+            //退出标记
+            mStopMutex.lock();
+            if(mStopFlag)
+                isDecoding = false;
+            mStopMutex.unlock();
+
+            if(syncer->getAudioDecodeDelay()>1
+                    ||syncer->getVideoDecodeDelay()>1) {
+                    QThread::msleep(100);
+            } else {
                 break;
             }
         }

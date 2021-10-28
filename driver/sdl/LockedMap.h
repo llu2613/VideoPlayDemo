@@ -54,11 +54,12 @@ public:
     }
 
     inline T &operator[](const Key &akey) {
+        T empty = T();
         LockedMapLocker lk(mMutex);
         std::map<Key, T>::iterator it = find(akey);
         if(it!=end())
             return (it->second);
-        return T();
+        return empty;
     }
 
 private:

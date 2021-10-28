@@ -1,6 +1,8 @@
 #include "SmtAudioPlayer.h"
 #include <QDebug>
 
+#define MAX_BUF_MEM_SIZE (10*1024*1024)
+
 //单例
 SmtAudioPlayer* SmtAudioPlayer::m_instance = nullptr;
 
@@ -138,7 +140,7 @@ void SmtAudioPlayer::eventAudioDeviceAdded(QString name)
 {
     qDebug()<<"eventAddCard, name:"<<name;
 
-    int cardId = openCard(name.toStdString(), mAudioSpec);
+    int cardId = openCard(name.toStdString(), mAudioSpec, MAX_BUF_MEM_SIZE);
     if(cardId!=-1) {
         emit audioCardOpened(name, cardId);
         qDebug()<<"eventAddCard, opened:"<<name<<cardId;
@@ -166,7 +168,8 @@ void SmtAudioPlayer::onCardDataPrepared(int cardId, std::map<int, std::shared_pt
              it!=dataMap.end(); ++it) {
         int idx = it->first;
         if(mSyncMap.contains(idx)&&mSyncMap.at(idx)) {
-            mSyncMap.at(idx)->setPlayingSample(dataMap.at(idx));
+            std::shared_ptr<SampleBuffer> b = dataMap.at(idx);
+            mSyncMap.at(idx)->setAudioPlayingTs(b->timestamp);
         }
     }
     mSyncMap.unlock();
