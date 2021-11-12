@@ -16,7 +16,7 @@ int FFmpegSwresample::init(AVCodecContext *pCodeCtx,
 {
     return init(pCodeCtx->sample_fmt,
                 pCodeCtx->sample_rate,
-                pCodeCtx->channel_layout||av_get_default_channel_layout(pCodeCtx->channels),
+                pCodeCtx->channels?av_get_default_channel_layout(pCodeCtx->channels):pCodeCtx->channel_layout,
                 out_fmt, out_rate, out_ch_layout);
 }
 

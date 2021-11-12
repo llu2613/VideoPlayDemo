@@ -79,7 +79,8 @@ SOURCES += \
     driver/sdl/SdlEventDispatcher.cpp \
     decoder/StreamMediaDecoder.cpp \
     common/RepeatableThread.cpp \
-    decoder/FFAvioContextHandle.cpp
+    decoder/FFAvioContextHandle.cpp \
+    encoder/FFmpegFileMerger.cpp
 
 HEADERS += \
         mainwindow.h \
@@ -110,7 +111,8 @@ HEADERS += \
     driver/sdl/SdlEventDispatcher.h \
     decoder/StreamMediaDecoder.h \
     common/RepeatableThread.h \
-    decoder/FFAvioContextHandle.h
+    decoder/FFAvioContextHandle.h \
+    encoder/FFmpegFileMerger.h
 
 FORMS += \
         mainwindow.ui

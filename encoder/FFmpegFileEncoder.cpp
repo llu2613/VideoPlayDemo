@@ -2,11 +2,11 @@
 #include<iostream>
 
 /*
-  Ffmpeg ”∆µø™∑¢ΩÃ≥Ã(“ª)°™°™ µœ÷ ”∆µ∏Ò Ω◊™ªªπ¶ƒ‹≥¨œÍœ∏∞Ê
+  FfmpegËßÜÈ¢ëÂºÄÂèëÊïôÁ®ã(‰∏Ä)‚Äî‚ÄîÂÆûÁé∞ËßÜÈ¢ëÊ†ºÂºèËΩ¨Êç¢ÂäüËÉΩË∂ÖËØ¶ÁªÜÁâà
   https://blog.csdn.net/zhangamxqun/article/details/80304494
-  FFmpeg  æ¿˝◊™∑‚◊∞◊™¬Î-transcoding
+  FFmpeg Á§∫‰æãËΩ¨Â∞ÅË£ÖËΩ¨Á†Å-transcoding
   https://www.jianshu.com/p/f04e0028dd14
-  FFmpeg “Ù∆µ÷ÿ≤…—˘
+  FFmpeg Èü≥È¢ëÈáçÈááÊ†∑
   https://blog.csdn.net/qq_44623068/article/details/109702950
 */
 
@@ -21,8 +21,8 @@ using namespace std;
 void ffmpegLogCallback(void *avcl, int level, const char *fmt,
 	va_list vl) {
 
-//    if (level >= av_log_get_level())
-//        return;
+	if (level >= av_log_get_level()) 
+		return;
 
 	char logBuffer[2048];
 	int cnt = vsnprintf(logBuffer, sizeof(logBuffer) / sizeof(char), fmt, vl);
@@ -31,10 +31,8 @@ void ffmpegLogCallback(void *avcl, int level, const char *fmt,
 
 FFmpegFileEncoder::FFmpegFileEncoder()
 {
-	av_register_all();
-	avfilter_register_all();
-    av_log_set_level(AV_LOG_INFO);
-	av_log_set_callback(ffmpegLogCallback);
+//	av_log_set_level(AV_LOG_WARNING);
+//	av_log_set_callback(ffmpegLogCallback);
 }
 
 
@@ -192,8 +190,8 @@ int FFmpegFileEncoder::open_output_file(const char *filename)
 				av_log(NULL, AV_LOG_ERROR, "Failed to copy encoder parameters to output stream #%u\n", i);
 				return ret;
 			}
-//			cout << "#" << i << " dec_ctx sp_rate " << dec_ctx->sample_rate << " f_size " << dec_ctx->frame_size << endl;
-//			cout << "#" << i << " enc_ctx sp_rate " << enc_ctx->sample_rate << " f_size " << enc_ctx->frame_size << endl;
+			cout << "#" << i << " dec_ctx sp_rate " << dec_ctx->sample_rate << " f_size " << dec_ctx->frame_size << endl;
+			cout << "#" << i << " enc_ctx sp_rate " << enc_ctx->sample_rate << " f_size " << enc_ctx->frame_size << endl;
 			if (ofmt_ctx->oformat->flags & AVFMT_GLOBALHEADER)
 				enc_ctx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
 
@@ -292,12 +290,12 @@ int FFmpegFileEncoder::init_swr_ctx(AVCodecContext *dec_ctx,
 	AVCodecContext *enc_ctx)
 {
 	swr_ctx = swr_alloc_set_opts(NULL, //ctx
-		enc_ctx->channel_layout,     // ‰≥ˆµƒchannel ≤ºæ÷
-		enc_ctx->sample_fmt,         // ‰≥ˆµƒ≤…—˘∏Ò Ω
-		enc_ctx->sample_rate,        // ‰≥ˆµƒ≤…—˘¬ 
-		dec_ctx->channel_layout,     // ‰»Îµƒ channel ≤ºæ÷
-		dec_ctx->sample_fmt,         // ‰»Îµƒ≤…—˘∏Ò Ω
-		dec_ctx->sample_rate,        //≥ˆ»Îµƒ≤…—˘¬ 
+		enc_ctx->channel_layout,     //ËæìÂá∫ÁöÑchannel Â∏ÉÂ±Ä
+		enc_ctx->sample_fmt,         //ËæìÂá∫ÁöÑÈááÊ†∑Ê†ºÂºè
+		enc_ctx->sample_rate,        //ËæìÂá∫ÁöÑÈááÊ†∑Áéá
+		dec_ctx->channel_layout,     //ËæìÂÖ•ÁöÑ channel Â∏ÉÂ±Ä
+		dec_ctx->sample_fmt,         //ËæìÂÖ•ÁöÑÈááÊ†∑Ê†ºÂºè
+		dec_ctx->sample_rate,        //Âá∫ÂÖ•ÁöÑÈááÊ†∑Áéá
 		0, NULL
 	);
 
@@ -316,25 +314,25 @@ int FFmpegFileEncoder::init_swr_ctx(AVCodecContext *dec_ctx,
 		return ret;
 	}
 	
-	//¥¥Ω® ‰»Îª∫≥Â«¯
+	//ÂàõÂª∫ËæìÂÖ•ÁºìÂÜ≤Âå∫
 	av_samples_alloc_array_and_samples(
-		&src_data,          //ª∫≥Â«¯µƒµÿ÷∑
-		&src_linesize,		//ª∫≥Â«¯µƒ¥Û–°
-		av_get_channel_layout_nb_channels(dec_ctx->channel_layout),	//Õ®µ¿∏ˆ ˝
-		dec_ctx->sample_rate,   //µ•Õ®µ¿≤…—˘¥Û–°
-		dec_ctx->sample_fmt,    //≤…—˘µƒ∏Ò Ω
+		&src_data,          //ÁºìÂÜ≤Âå∫ÁöÑÂú∞ÂùÄ
+		&src_linesize,		//ÁºìÂÜ≤Âå∫ÁöÑÂ§ßÂ∞è
+		av_get_channel_layout_nb_channels(dec_ctx->channel_layout),	//ÈÄöÈÅì‰∏™Êï∞
+		dec_ctx->sample_rate,   //ÂçïÈÄöÈÅìÈááÊ†∑Â§ßÂ∞è
+		dec_ctx->sample_fmt,    //ÈááÊ†∑ÁöÑÊ†ºÂºè
 		0);
-	//¥¥Ω® ‰≥ˆª∫≥Â«¯
+	//ÂàõÂª∫ËæìÂá∫ÁºìÂÜ≤Âå∫
 	av_samples_alloc_array_and_samples(
-		&dst_data,          //ª∫≥Â«¯µƒµÿ÷∑
-		&dst_linesize,		//ª∫≥Â«¯µƒ¥Û–°
-		av_get_channel_layout_nb_channels(enc_ctx->channel_layout),	//Õ®µ¿∏ˆ ˝
-		enc_ctx->sample_rate,   //µ•Õ®µ¿≤…—˘¥Û–°
-		enc_ctx->sample_fmt,	//≤…—˘µƒ∏Ò Ω
+		&dst_data,          //ÁºìÂÜ≤Âå∫ÁöÑÂú∞ÂùÄ
+		&dst_linesize,		//ÁºìÂÜ≤Âå∫ÁöÑÂ§ßÂ∞è
+		av_get_channel_layout_nb_channels(enc_ctx->channel_layout),	//ÈÄöÈÅì‰∏™Êï∞
+		enc_ctx->sample_rate,   //ÂçïÈÄöÈÅìÈááÊ†∑Â§ßÂ∞è
+		enc_ctx->sample_fmt,	//ÈááÊ†∑ÁöÑÊ†ºÂºè
 		0);
 
-	std::cout << " ‰»Îµƒª∫≥Â«¯¥Û–°Œ™ : " << src_linesize  << "\n";
-	std::cout << " ‰≥ˆµƒª∫≥Â«¯¥Û–°Œ™ : " << dst_linesize << "\n";
+	std::cout << "ËæìÂÖ•ÁöÑÁºìÂÜ≤Âå∫Â§ßÂ∞è‰∏∫ : " << src_linesize  << "\n";
+	std::cout << "ËæìÂá∫ÁöÑÁºìÂÜ≤Âå∫Â§ßÂ∞è‰∏∫ : " << dst_linesize << "\n";
 
 	return ret;
 }
@@ -353,7 +351,7 @@ int FFmpegFileEncoder::swr_convert_packet(AVPacket* packet,
 
 void FFmpegFileEncoder::free_swr_ctx()
 {
-	// Õ∑≈◊ ‘¥
+	//ÈáäÊîæËµÑÊ∫ê
 	if (src_data) {
 		av_freep(&src_data[0]);
 		av_freep(src_data);
@@ -674,64 +672,38 @@ int FFmpegFileEncoder::encode_write_frame(AVFrame *filt_frame, unsigned int stre
 				return ret;
 		}
 	} else {
-		ret = avcodec_encode_video2(stream_ctx[stream_index].enc_ctx, &enc_pkt,
-			filt_frame, got_frame);
-		if (ret < 0)
-			return ret;
-		if (!(*got_frame))
-			return 0;
+        ret = avcodec_send_frame(stream_ctx[stream_index].enc_ctx, filt_frame);
+        if(ret != 0) {
+            print_error("avcodec_send_frame", ret);
+            return ret;
+        }
+        for(;;) {
+            ret = avcodec_receive_packet(stream_ctx[stream_index].enc_ctx, &enc_pkt);
+            if(ret!=0) {
+                break;
+            }
+            /* prepare packet for muxing */
+            enc_pkt.stream_index = stream_index;
+            av_packet_rescale_ts(&enc_pkt,
+                stream_ctx[stream_index].enc_ctx->time_base,
+                ofmt_ctx->streams[stream_index]->time_base);
 
-		{
-			AVRational enc_timebase = stream_ctx[stream_index].enc_ctx->time_base;
-			AVRational ofmt_timebase = ofmt_ctx->streams[stream_index]->time_base;
-			av_log(NULL, AV_LOG_DEBUG, "Muxing before #%d, enc_pkt->dts=%ld, enc_pkt->pts=%ld, enc_pkt->duration=%ld,"\
-				" enc_ctx->time_base=%d/%d, ofmt_ctx->time_base=%d/%d\n", stream_index, enc_pkt.dts, enc_pkt.pts, enc_pkt.duration,
-				enc_timebase.num, enc_timebase.den, ofmt_timebase.num, ofmt_timebase.den);
-		}
+//            enc_pkt.pts = stream_ctx[stream_index].video_pts;
+//            enc_pkt.dts = enc_pkt.pts;
+//            enc_pkt.duration = av_rescale_q(1,
+//                stream_ctx[stream_index].enc_ctx->time_base,
+//                ofmt_ctx->streams[stream_index]->time_base);
+//            stream_ctx[stream_index].video_pts += enc_pkt.duration;
 
-		/* prepare packet for muxing */
-		enc_pkt.stream_index = stream_index;
-		av_packet_rescale_ts(&enc_pkt,
-			stream_ctx[stream_index].enc_ctx->time_base,
-			ofmt_ctx->streams[stream_index]->time_base);
-
-		{
-			AVRational dec_timebase = stream_ctx[stream_index].dec_ctx->time_base;
-			AVRational enc_timebase = stream_ctx[stream_index].enc_ctx->time_base;
-			AVRational ifmt_timebase = ifmt_ctx->streams[stream_index]->time_base;
-			AVRational ofmt_timebase = ofmt_ctx->streams[stream_index]->time_base;
-			AVRational ifmtc_timebase = ifmt_ctx->streams[stream_index]->codec->time_base;
-			AVRational ofmtc_timebase = ofmt_ctx->streams[stream_index]->codec->time_base;
-			AVRational ifmt_avg_frame_rate = ifmt_ctx->streams[stream_index]->avg_frame_rate;
-			AVRational ofmt_avg_frame_rate = ofmt_ctx->streams[stream_index]->avg_frame_rate;
-			av_log(NULL, AV_LOG_DEBUG, "Rational  #%d, dec_ctx->time_base=%d/%d, ifmt->time_base=%d/%d, ifmtc->time_base=%d/%d,"\
-				" enc_ctx->time_base=%d/%d, ofmt->time_base=%d/%d, ofmtc->time_base=%d/%d,"\
-				" ifmt->frame_rate=%d/%d, ofmt->frame_rate=%d/%d\n", stream_index,
-				dec_timebase.num, dec_timebase.den,
-				ifmt_timebase.num, ifmt_timebase.den,
-				ifmtc_timebase.num, ifmtc_timebase.den,
-				enc_timebase.num, enc_timebase.den,
-				ofmt_timebase.num, ofmt_timebase.den,
-				ofmtc_timebase.num, ofmtc_timebase.den,
-				ifmt_avg_frame_rate.num, ifmt_avg_frame_rate.den,
-				ofmt_avg_frame_rate.num, ofmt_avg_frame_rate.den);
-		}
-		
-		enc_pkt.pts = stream_ctx[stream_index].video_pts;
-		enc_pkt.dts = enc_pkt.pts;
-		enc_pkt.duration = av_rescale_q(1,
-			stream_ctx[stream_index].enc_ctx->time_base,
-			ofmt_ctx->streams[stream_index]->time_base);
-		stream_ctx[stream_index].video_pts += enc_pkt.duration;
-		
-		//av_log(NULL, AV_LOG_DEBUG, "Muxing frame\n");
-		AVRational enc_timebase = stream_ctx[stream_index].enc_ctx->time_base;
-		AVRational ofmt_timebase = ofmt_ctx->streams[stream_index]->time_base;
-		av_log(NULL, AV_LOG_DEBUG, "Muxing frame #%d, enc_pkt->dts=%ld, enc_pkt->pts=%ld, enc_pkt->duration=%ld,"\
-			" enc_ctx->time_base=%d/%d, ofmt_ctx->time_base=%d/%d\n", stream_index, enc_pkt.dts, enc_pkt.pts, enc_pkt.duration,
-			enc_timebase.num, enc_timebase.den, ofmt_timebase.num, ofmt_timebase.den);
-		/* mux encoded frame */
-		ret = av_interleaved_write_frame(ofmt_ctx, &enc_pkt);
+            //av_log(NULL, AV_LOG_DEBUG, "Muxing frame\n");
+            AVRational enc_timebase = stream_ctx[stream_index].enc_ctx->time_base;
+            AVRational ofmt_timebase = ofmt_ctx->streams[stream_index]->time_base;
+            av_log(NULL, AV_LOG_DEBUG, "Muxing frame #%d, enc_pkt->dts=%ld, enc_pkt->pts=%ld, enc_pkt->duration=%ld,"\
+                " enc_ctx->time_base=%d/%d, ofmt_ctx->time_base=%d/%d\n", stream_index, enc_pkt.dts, enc_pkt.pts, enc_pkt.duration,
+                enc_timebase.num, enc_timebase.den, ofmt_timebase.num, ofmt_timebase.den);
+            /* mux encoded frame */
+            ret = av_interleaved_write_frame(ofmt_ctx, &enc_pkt);
+        }
 		av_packet_unref(&enc_pkt);
 		return ret;
 	}
@@ -786,10 +758,8 @@ int FFmpegFileEncoder::encode_write_frame_fifo(AVFrame *filt_frame, unsigned int
 			ret = encode_write_frame(output_frame, stream_index);
 			av_frame_free(&output_frame);
 		}
-	}
-	else {
+    } else {
 		ret = encode_write_frame(filt_frame, stream_index);
-		av_frame_free(&filt_frame);
 	}
 	return ret;
 }
@@ -797,7 +767,10 @@ int FFmpegFileEncoder::encode_write_frame_fifo(AVFrame *filt_frame, unsigned int
 int FFmpegFileEncoder::filter_encode_write_frame(AVFrame *frame, unsigned int stream_index)
 {
 	int ret;
-	AVFrame *filt_frame;
+    AVFrame *filt_frame = av_frame_alloc();
+    if (!filt_frame) {
+        return AVERROR(ENOMEM);
+    }
 
 	//av_log(NULL, AV_LOG_INFO, "Pushing decoded frame to filters\n");
 	/* push the decoded frame into the filtergraph */
@@ -810,10 +783,6 @@ int FFmpegFileEncoder::filter_encode_write_frame(AVFrame *frame, unsigned int st
 
 	/* pull filtered frames from the filtergraph */
 	while (1) {
-		filt_frame = av_frame_alloc();
-		if (!filt_frame) {
-			return AVERROR(ENOMEM);
-		}
 		//av_log(NULL, AV_LOG_INFO, "Pulling filtered frame from filters\n");
 		ret = av_buffersink_get_frame(filter_ctx[stream_index].buffersink_ctx,
 			filt_frame);
@@ -830,9 +799,10 @@ int FFmpegFileEncoder::filter_encode_write_frame(AVFrame *frame, unsigned int st
 		ret = encode_write_frame_fifo(filt_frame, stream_index);
 		if (ret < 0)
 			goto cleanup;
+        av_frame_unref(filt_frame);
 	}
 cleanup:
-	av_frame_free(&filt_frame);
+    av_frame_free(&filt_frame);
 	return ret;
 }
 
@@ -856,19 +826,18 @@ int FFmpegFileEncoder::flush_encoder(unsigned int stream_index)
 	return ret;
 }
 
-//goto”Ôæ‰ΩˆΩˆœﬁ”⁄ÕÀ≥ˆ ± π”√
 
 int FFmpegFileEncoder::test()
 {
 #if 0
-	// ‰»Î“™Ω¯––∏Ò Ω◊™ªªµƒŒƒº˛
+	//ËæìÂÖ•Ë¶ÅËøõË°åÊ†ºÂºèËΩ¨Êç¢ÁöÑÊñá‰ª∂
     char intput_file[] = "D:\\test\\86E13DDC-7CFA-4B9C-A875-476257CD6A13_1625045310.flv";
-	// ‰≥ˆ◊™ªª∫ÛµƒŒƒº˛
+	//ËæìÂá∫ËΩ¨Êç¢ÂêéÁöÑÊñá‰ª∂
     char output_file[] = "D:\\test\\qinghuaci_out0.webm";
-#else //Õ¯¬ÁŒƒº˛
-	// ‰»Î“™Ω¯––∏Ò Ω◊™ªªµƒŒƒº˛
+#else //ÁΩëÁªúÊñá‰ª∂
+	//ËæìÂÖ•Ë¶ÅËøõË°åÊ†ºÂºèËΩ¨Êç¢ÁöÑÊñá‰ª∂
     char intput_file[] = "D:\\test\\qinghuaci.mp4";
-	// ‰≥ˆ◊™ªª∫ÛµƒŒƒº˛
+	//ËæìÂá∫ËΩ¨Êç¢ÂêéÁöÑÊñá‰ª∂
     char output_file[] = "D:\\test\\qinghuaci_out2.webm";
 #endif
 
@@ -893,10 +862,6 @@ int FFmpegFileEncoder::transcoding(const char *intput_file, const char *output_f
 	unsigned int i;
 	int got_frame;
 	int(*dec_func)(AVCodecContext *, AVFrame *, int *, const AVPacket *);
-
-	//av_register_all();
-	//avfilter_register_all();
-	//av_log_set_level(AV_LOG_DEBUG);
 
 	if ((ret = open_input_file(intput_file)) < 0)
 		goto end;
@@ -929,30 +894,28 @@ int FFmpegFileEncoder::transcoding(const char *intput_file, const char *output_f
 			av_packet_rescale_ts(packet,
 				ifmt_ctx->streams[stream_index]->time_base,
 				stream_ctx[stream_index].dec_ctx->time_base);
-			dec_func = (type == AVMEDIA_TYPE_VIDEO) ? avcodec_decode_video2 :
-				avcodec_decode_audio4;
-			ret = dec_func(stream_ctx[stream_index].dec_ctx, frame,
-				&got_frame, packet);
-			if (ret < 0) {
-				av_frame_free(&frame);
-				av_log(NULL, AV_LOG_ERROR, "Decoding failed\n");
-				break;
-			}
 
-			if (got_frame) {
-				/*cout <<"#"<< stream_index << " got_frame pts " << frame->pts <<" pkt_pts "<< frame->pkt_pts 
-					<< " pkt_dts " << frame->pkt_dts << " pkt_dur " << frame->pkt_duration <<" be "<< frame->best_effort_timestamp << endl;*/
-				frame->pts = frame->best_effort_timestamp;
-				ret = filter_encode_write_frame(frame, stream_index);
-				av_frame_free(&frame);
-				if (ret < 0)
-					goto end;
-			}
-			else {
-				av_frame_free(&frame);
-			}
-		}
-		else {
+            avcodec_send_packet(stream_ctx[stream_index].dec_ctx, packet);
+            if (ret != 0) {
+                av_frame_free(&frame);
+                print_error("avcodec_send_packet", ret);
+                break;
+            }
+            for (int i=0;i<100;i++) {
+                ret = avcodec_receive_frame(stream_ctx[stream_index].dec_ctx, frame);
+                if (ret != 0) {
+                    break;
+                }
+                /*cout <<"#"<< stream_index << " got_frame pts " << frame->pts <<" pkt_pts "<< frame->pkt_pts
+                    << " pkt_dts " << frame->pkt_dts << " pkt_dur " << frame->pkt_duration <<" be "<< frame->best_effort_timestamp << endl;*/
+                frame->pts = frame->best_effort_timestamp;
+                ret = filter_encode_write_frame(frame, stream_index);
+                if (ret < 0) {
+                    break;
+                }
+            }
+            av_frame_free(&frame);
+        } else {
 			/* remux this frame without reencoding */
 			av_packet_rescale_ts(packet,
 				ifmt_ctx->streams[stream_index]->time_base,

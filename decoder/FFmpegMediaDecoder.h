@@ -34,7 +34,7 @@ public:
         EndOfFile  //结束
     };
     explicit FFmpegMediaDecoder();
-    ~FFmpegMediaDecoder();
+    virtual ~FFmpegMediaDecoder();
 
     int open(const char* input, bool hwaccels);
     int open(const char* input, AVDictionary *dict, bool hwaccels);
@@ -66,6 +66,7 @@ public:
     long readFailedCount();
 
 protected:
+    const AVFormatContext* formatContext();
     const AVCodecContext* audioCodecContext();
     const AVCodecContext* videoCodecContext();
     const AVStream* audioStream();
@@ -104,6 +105,9 @@ private:
     int initVideoCodec(AVFormatContext *pFormatCtx, int stream_idx);
     int openCodec(AVFormatContext *pFormatCtx,
                   int stream_idx, AVCodecContext **pCodeCtx);
+    AVHWAccel *findHwaccel(enum AVCodecID codec_id, enum AVPixelFormat pix_fmt);
+	int openHwCodec(AVFormatContext *pFormatCtx,
+				int stream_idx, AVCodecContext **pCodeCtx);
 
     void printCodecInfo(AVCodecContext *pCodeCtx);
 

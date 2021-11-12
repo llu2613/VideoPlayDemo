@@ -1,15 +1,14 @@
-#ifndef FFMPEGFILEENCODER_H
-#define FFMPEGFILEENCODER_H
+#pragma once
 
 extern "C" {
-#include "libavcodec/avcodec.h" //ç¼–è§£ç 
-#include "libavformat/avformat.h" //å°è£…æ ¼å¼
-#include "libavutil/common.h" //å…¶ä»–å·¥å…·ç±»
-#include "libavutil/imgutils.h" //å›¾å½¢ç¼“å­˜å¤„ç†
-//#include "libswscale/swscale.h"  //éŸ³é¢‘è½¬æ¢
-#include "libswresample/swresample.h" //è§†é¢‘è½¬æ¢
+#include "libavcodec/avcodec.h" //±à½âÂë
+#include "libavformat/avformat.h" //·â×°¸ñÊ½
+#include "libavutil/common.h" //ÆäËû¹¤¾ßÀà
+#include "libavutil/imgutils.h" //Í¼ĞÎ»º´æ´¦Àí
+//#include "libswscale/swscale.h"  //ÒôÆµ×ª»»
+#include "libswresample/swresample.h" //ÊÓÆµ×ª»»
 #include "libavutil/error.h"
-#include "libavutil/time.h"  //æ—¶é—´å‡½æ•°
+#include "libavutil/time.h"  //Ê±¼äº¯Êı
 #include "libavutil/opt.h"
 #include "libavutil/audio_fifo.h"
 #include "libavutil/mathematics.h"
@@ -37,9 +36,9 @@ class FFmpegFileEncoder
 	
 public:
 	FFmpegFileEncoder();
-    virtual ~FFmpegFileEncoder();
+	~FFmpegFileEncoder();
 
-    int test();
+	int test();
 	int transcoding(const char *intput_file, const char *output_file);
 
 private:
@@ -48,12 +47,12 @@ private:
 	FilteringContext *filter_ctx = NULL;
 	StreamContext *stream_ctx = NULL;
 
-	//é‡é‡‡æ ·
+	//ÖØ²ÉÑù
 	SwrContext* swr_ctx = NULL;
-	//å­˜æ”¾çš„æ•°æ®
+	//´æ·ÅµÄÊı¾İ
 	uint8_t** src_data = NULL;
 	uint8_t** dst_data = NULL;
-	//å­˜æ”¾çš„æ•°æ®å¤§å°
+	//´æ·ÅµÄÊı¾İ´óĞ¡
 	int src_linesize = 0;
 	int dst_linesize = 0;
 
@@ -92,4 +91,3 @@ private:
 	}
 };
 
-#endif // FFMPEGFILEENCODER_H

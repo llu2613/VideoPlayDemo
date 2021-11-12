@@ -316,6 +316,52 @@ int FFmpegMediaDecoder::openCodec(AVFormatContext *pFormatCtx, int stream_idx,
     return ret;
 }
 
+AVHWAccel *FFmpegMediaDecoder::findHwaccel(enum AVCodecID codec_id, enum AVPixelFormat pix_fmt)
+{
+	AVHWAccel *hwaccel = NULL;
+
+	while ((hwaccel = av_hwaccel_next(hwaccel))) {
+		if (hwaccel->id == codec_id
+			&& hwaccel->pix_fmt == pix_fmt)
+			return hwaccel;
+	}
+	return NULL;
+}
+int FFmpegMediaDecoder::openHwCodec(AVFormatContext *pFormatCtx, int stream_idx,
+									AVCodecContext **pCodeCtx)
+{
+	int ret = 0;
+	
+	AVCodecParameters *pCodecPar = pFormatCtx->streams[stream_idx]->codecpar;
+	if (!(*pCodeCtx))
+		avcodec_free_context(pCodeCtx);
+
+	findHwaccel(pCodecPar->codec_id, (enum AVPixelFormat)pCodecPar->format);
+	//AVCodec *pCodec = avcodec_find_decoder_by_name("h264_qsv");//Intel核心显卡
+	//if (!pCodec) pCodec = avcodec_find_decoder_by_name("h264_nvenc");//英伟达显卡
+	AVCodec *pCodec = avcodec_find_decoder(pCodecPar->codec_id);
+	if (pCodec == NULL) {
+		printError(-1, "无法解码(pCodec)");
+		return -1;
+	}
+
+	*pCodeCtx = avcodec_alloc_context3(pCodec);
+	if (*pCodeCtx == NULL) {
+		printError(-1, "无法解码(pCodeCtx)");
+		return -1;
+	}
+
+	avcodec_parameters_to_context(*pCodeCtx, pCodecPar);
+	//5.打开解码器
+	ret = avcodec_open2(*pCodeCtx, pCodec, NULL);
+	if (ret < 0) {
+		printError(ret, "编码器无法打开");
+		return ret;
+	}
+
+	return ret;
+}
+
 int FFmpegMediaDecoder::initAudioCodec(AVFormatContext *pFormatCtx, int stream_idx)
 {
     int ret = 0;
@@ -337,7 +383,7 @@ int FFmpegMediaDecoder::initVideoCodec(AVFormatContext *pFormatCtx, int stream_i
 {
     int ret = 0;
     //打开解码器
-    ret = openCodec(pFormatCtx, stream_idx, &pVideoCodecCtx);
+    ret = openHwCodec(pFormatCtx, stream_idx, &pVideoCodecCtx);
     if(ret<0) {
         printError(ret, "视频解码器打开失败");
         return ret;
@@ -488,10 +534,14 @@ int FFmpegMediaDecoder::decoding()
     }
 
     //释放资源
-    //av_free_packet(mAVPacket);
 	av_packet_unref(mAVPacket);
 
     return retCode;
+}
+
+const AVFormatContext* FFmpegMediaDecoder::formatContext()
+{
+    return pFormatCtx;
 }
 
 const AVCodecContext * FFmpegMediaDecoder::audioCodecContext()

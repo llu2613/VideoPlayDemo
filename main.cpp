@@ -3,6 +3,7 @@
 #include "driver/sdl/SdlAudioPlayer.h"
 #include <QDebug>
 #include "encoder/FFmpegFileEncoder.h"
+#include "encoder/FFmpegFileMerger.h"
 
 int main(int argc, char *argv[])
 {
@@ -13,6 +14,9 @@ int main(int argc, char *argv[])
 
 //    FFmpegFileEncoder encoder;
 //    encoder.test();
+
+//    FFmpegFileMerger merger;
+//    merger.test();
 
     MainWindow w;
     w.show();
