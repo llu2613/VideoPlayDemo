@@ -1,5 +1,6 @@
-#include "FFmpegFileEncoder.h"
+﻿#include "FFmpegFileEncoder.h"
 #include<iostream>
+#include <QDebug>
 
 /*
   Ffmpeg视频开发教程(一)——实现视频格式转换功能超详细版
@@ -18,7 +19,7 @@
 
 using namespace std;
 
-void ffmpegLogCallback(void *avcl, int level, const char *fmt,
+static void ff_log_callback(void *avcl, int level, const char *fmt,
 	va_list vl) {
 
 	if (level >= av_log_get_level()) 
@@ -31,8 +32,8 @@ void ffmpegLogCallback(void *avcl, int level, const char *fmt,
 
 FFmpegFileEncoder::FFmpegFileEncoder()
 {
-//	av_log_set_level(AV_LOG_WARNING);
-//	av_log_set_callback(ffmpegLogCallback);
+    av_log_set_level(AV_LOG_WARNING);
+//    av_log_set_callback(ff_log_callback);
 }
 
 
@@ -169,8 +170,9 @@ int FFmpegFileEncoder::open_output_file(const char *filename)
 					enc_ctx->sample_rate = 48000;
 				} else {
 					enc_ctx->sample_rate = dec_ctx->sample_rate;
-				}
-				enc_ctx->channel_layout = dec_ctx->channel_layout;
+                }
+				enc_ctx->channel_layout = dec_ctx->channel_layout?dec_ctx->channel_layout:
+						av_get_default_channel_layout(dec_ctx->channels);
 				enc_ctx->channels = av_get_channel_layout_nb_channels(enc_ctx->channel_layout);
 				/* take first format from list of supported formats */
 				enc_ctx->sample_fmt = encoder->sample_fmts[0];
@@ -282,7 +284,7 @@ int FFmpegFileEncoder::init_swr_context()
 			break;
 		}
 	}
-	std::cout << "can not find audio codec in stream_ctx.\n";
+    std::cout << "can not find audio codec in stream_ctx.\n";
 	return ret;
 }
 
@@ -619,13 +621,9 @@ int FFmpegFileEncoder::init_filters(void)
 	return 0;
 }
 
-int FFmpegFileEncoder::encode_write_frame(AVFrame *filt_frame, unsigned int stream_index, int *got_frame) {
+int FFmpegFileEncoder::encode_write_frame(AVFrame *filt_frame, unsigned int stream_index) {
 	int ret;
-	int got_frame_local;
 	AVPacket enc_pkt;
-
-	if (!got_frame)
-		got_frame = &got_frame_local;
 
 	//av_log(NULL, AV_LOG_INFO, "Encoding frame\n");
 	/* encode filtered frame */
@@ -636,14 +634,14 @@ int FFmpegFileEncoder::encode_write_frame(AVFrame *filt_frame, unsigned int stre
 	if (stream_ctx[stream_index].enc_ctx->codec_type == AVMEDIA_TYPE_AUDIO) {
 		if (filt_frame) {
 			filt_frame->pts = stream_ctx[stream_index].audio_pts;
-			stream_ctx[stream_index].audio_pts += filt_frame->nb_samples;
-		}
+            stream_ctx[stream_index].audio_pts += filt_frame->nb_samples;
+        }
 
-		ret = avcodec_send_frame(stream_ctx[stream_index].enc_ctx, filt_frame);
-		if (ret < 0) {
-			av_log(NULL, AV_LOG_ERROR, "Error submitting the frame to the encoder, %s\n", wrap_av_err2str(ret));
-			return ret;
-		}
+        ret = avcodec_send_frame(stream_ctx[stream_index].enc_ctx, filt_frame);
+        if (ret < 0) {
+            av_log(NULL, AV_LOG_ERROR, "Error submitting the frame to the encoder, %s\n", wrap_av_err2str(ret));
+            return ret;
+        }
 
 		while (1) {
 			ret = avcodec_receive_packet(stream_ctx[stream_index].enc_ctx, &enc_pkt);
@@ -677,7 +675,7 @@ int FFmpegFileEncoder::encode_write_frame(AVFrame *filt_frame, unsigned int stre
             print_error("avcodec_send_frame", ret);
             return ret;
         }
-        for(;;) {
+        for (int i=0;i<100;i++) {
             ret = avcodec_receive_packet(stream_ctx[stream_index].enc_ctx, &enc_pkt);
             if(ret!=0) {
                 break;
@@ -809,19 +807,16 @@ cleanup:
 int FFmpegFileEncoder::flush_encoder(unsigned int stream_index)
 {
 	int ret;
-	int got_frame;
 
 	if (!(stream_ctx[stream_index].enc_ctx->codec->capabilities &
 		AV_CODEC_CAP_DELAY))
 		return 0;
 
-	while (1) {
+    for(int i=0; i<100; i++) {
 		//av_log(NULL, AV_LOG_INFO, "Flushing stream #%u encoder\n", stream_index);
-		ret = encode_write_frame(NULL, stream_index, &got_frame);
+        ret = encode_write_frame(NULL, stream_index);
 		if (ret < 0)
 			break;
-		if (!got_frame)
-			return 0;
 	}
 	return ret;
 }
@@ -831,9 +826,9 @@ int FFmpegFileEncoder::test()
 {
 #if 0
 	//输入要进行格式转换的文件
-    char intput_file[] = "D:\\test\\86E13DDC-7CFA-4B9C-A875-476257CD6A13_1625045310.flv";
+    char intput_file[] = "http://192.168.1.60:9080/m3u8file/969DB99A-535D-42C5-B2C3-6A93926435751283.m3u8";
 	//输出转换后的文件
-    char output_file[] = "D:\\test\\qinghuaci_out0.webm";
+    char output_file[] = "D:\\test\\qinghuaci_out0_.mp4";
 #else //网络文件
 	//输入要进行格式转换的文件
     char intput_file[] = "D:\\test\\qinghuaci.mp4";
@@ -841,13 +836,13 @@ int FFmpegFileEncoder::test()
     char output_file[] = "D:\\test\\qinghuaci_out2.webm";
 #endif
 
-	cout << "transcoding, waiting..."<<endl;
+    qDebug() << "transcoding, waiting...";
 
 	int ret = transcoding(intput_file, output_file);
 
 	bool success = (ret >= 0);
 
-	cout << "transcoding " << (success ? "SUCCESS.": "FAILURE!")<<endl;
+    qDebug() << "transcoding " << (success ? "SUCCESS.": "FAILURE!");
 
 	return ret;
 }

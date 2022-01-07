@@ -1,4 +1,4 @@
-#ifndef SDLAUDIODEVICE_H
+﻿#ifndef SDLAUDIODEVICE_H
 #define SDLAUDIODEVICE_H
 
 #include <list>
@@ -85,6 +85,9 @@ public:
 
     void addData(int index, Uint8* buf, int len, double timestamp=0);
 
+    int mixVolume();
+    void setMixVolume(int volume);
+
     std::list<int> indexs();
 
     void setMaxMemory(int size);
@@ -109,6 +112,7 @@ private:
     CardState mState;
     int mIscapture;
     char mDeviceName[256];
+    int mMixVolume;
     SDL_AudioDeviceID mDeviceId;
     SDL_AudioSpec mDesiredSpec, mObtainedSpec;
     LockedMap<int, SdlAudioDevBuf*> mDataMap;

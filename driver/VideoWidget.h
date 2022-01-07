@@ -51,6 +51,7 @@ public slots:
     void onAudioData(std::shared_ptr<MediaData> data);
     void onVideoData(std::shared_ptr<MediaData> data);
     void onShowVideoData(std::shared_ptr<MediaData> data);
+    void onAudioCardOpened(QString name, int cardId);
 
 private slots:
 

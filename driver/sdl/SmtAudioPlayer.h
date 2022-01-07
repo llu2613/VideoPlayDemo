@@ -1,4 +1,4 @@
-#ifndef SMTAUDIOPLAYER_H
+﻿#ifndef SMTAUDIOPLAYER_H
 #define SMTAUDIOPLAYER_H
 
 #include <QObject>
@@ -25,11 +25,15 @@ public:
     //单例
     static SmtAudioPlayer* inst();
 
+    void initialize();
+
     void setSync(int sourceId, AVSynchronizer *sync);
     void removeSync(int sourceId);
     void addData(int cardId, int sourceId, MediaData *data);
 
     void setSourceOpen(int sourceId, bool isOpen);
+    int cardVolume(int cardId);
+    void setCardVolume(int cardId, int volume);
 
     QList<int> getWaveformData(int sourceId);
     void clearWaveformData(int sourceId);

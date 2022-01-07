@@ -80,6 +80,10 @@ protected:
     virtual void audioDecodedData(AVFrame *frame, AVPacket *packet);
     virtual void videoDecodedData(AVFrame *frame, AVPacket *packet, int pixelHeight);
 
+    virtual void audioResampledData(AVPacket *packet, uint8_t *sampleBuffer,
+                                    int bufferSize, int samples);
+    virtual void videoScaledData(AVFrame *frame, AVPacket *packet, int pixelHeight);
+
     virtual void audioDataReady(std::shared_ptr<MediaData> data);
     virtual void videoDataReady(std::shared_ptr<MediaData> data);
 
@@ -108,6 +112,9 @@ private:
     AVHWAccel *findHwaccel(enum AVCodecID codec_id, enum AVPixelFormat pix_fmt);
 	int openHwCodec(AVFormatContext *pFormatCtx,
 				int stream_idx, AVCodecContext **pCodeCtx);
+				
+    void fillPixelRGB24(MediaData *mediaData, AVFrame *frame, int pixelWidth, int pixelHeight);
+    void fillPixelYUV420P(MediaData *mediaData, AVFrame *frame, int pixelWidth, int pixelHeight);
 
     void printCodecInfo(AVCodecContext *pCodeCtx);
 

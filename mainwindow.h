@@ -3,6 +3,7 @@
 
 #include <QMainWindow>
 #include <QList>
+#include <QButtonGroup>
 #include "driver/VideoWidget.h"
 #include "decoder/FFmpegMediaDecoder.h"
 
@@ -20,8 +21,11 @@ public:
 
 private:
     Ui::MainWindow *ui;
-
+    QButtonGroup *openGlGroupButton;
     QList<VideoWidget*> videoList;
+
+private slots:
+    void onOpenGLButtonGroupClicked(bool clicked);
 
 };
 

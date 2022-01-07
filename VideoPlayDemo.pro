@@ -80,7 +80,11 @@ SOURCES += \
     decoder/StreamMediaDecoder.cpp \
     common/RepeatableThread.cpp \
     decoder/FFAvioContextHandle.cpp \
-    encoder/FFmpegFileMerger.cpp
+    encoder/FFmpegFileMerger.cpp \
+    encoder/FFmpegAudioRecorder.cpp \
+    decoder/M3u8Parsing.cpp \
+    encoder/FFmpegAudioRecorder.cpp \
+    encoder/FFmpegAudioMerger.cpp
 
 HEADERS += \
         mainwindow.h \
@@ -112,7 +116,11 @@ HEADERS += \
     decoder/StreamMediaDecoder.h \
     common/RepeatableThread.h \
     decoder/FFAvioContextHandle.h \
-    encoder/FFmpegFileMerger.h
+    encoder/FFmpegFileMerger.h \
+    encoder/FFmpegAudioRecorder.h \
+    decoder/M3u8Parsing.h \
+    encoder/FFmpegAudioRecorder.h \
+    encoder/FFmpegAudioMerger.h
 
 FORMS += \
         mainwindow.ui

@@ -192,24 +192,7 @@ void FFmpegMediaDecoder::audioDecodedData(AVFrame *frame, AVPacket *packet)
 //            fwrite(pAudioOutBuffer, 1, out_buffer_size, fp_pcm);
 //        }
 
-    try {
-        std::shared_ptr<MediaData> mediaData(new MediaData);
-        mediaData->sample_format = scaler.outAudioFmt();
-        mediaData->nb_samples = out_samples;
-        mediaData->sample_rate = scaler.outAudioRate();
-        mediaData->channels = scaler.outAudioChannels();
-        mediaData->pts = packet->pts;
-        mediaData->duration = packet->duration;
-        AVStream *stream = pFormatCtx->streams[packet->stream_index];
-        mediaData->time_base_d = av_q2d(stream->time_base);
-        //帧数据
-        mediaData->data[0] = new unsigned char[out_buffer_size];
-        mediaData->datasize[0] = out_buffer_size;
-        memcpy(mediaData->data[0], pAudioOutBuffer, out_buffer_size);
-        audioDataReady(mediaData);
-    } catch(...) {
-        LOG("audioDecodedData failed share data!");
-    }
+    audioResampledData(packet, pAudioOutBuffer, out_buffer_size, out_samples);
 }
 
 void FFmpegMediaDecoder::videoDecodedData(AVFrame *frame, AVPacket *packet, int pixelHeight)
@@ -222,7 +205,7 @@ void FFmpegMediaDecoder::videoDecodedData(AVFrame *frame, AVPacket *packet, int 
     int out_height;
     AVFrame* out_frame = scaler.videoScale(pixelHeight, frame, &out_height);
 
-    AVFrame *pFrameYUV = out_frame;
+//    AVFrame *pFrameYUV = out_frame;
 //        if(fp_yuv) {
 //            //输出到YUV文件
 //            //AVFrame像素帧写入文件
@@ -234,12 +217,39 @@ void FFmpegMediaDecoder::videoDecodedData(AVFrame *frame, AVPacket *packet, int 
 //            fwrite(pFrameYUV->data[1], 1, y_size / 4, fp_yuv);
 //            fwrite(pFrameYUV->data[2], 1, y_size / 4, fp_yuv);
 //        }
+    videoScaledData(out_frame, packet, out_height);
+}
 
+void FFmpegMediaDecoder::audioResampledData(AVPacket *packet, uint8_t *sampleBuffer,
+	int bufferSize, int samples)
+{
+    try {
+        std::shared_ptr<MediaData> mediaData(new MediaData);
+        mediaData->sample_format = scaler.outAudioFmt();
+        mediaData->nb_samples = samples;
+        mediaData->sample_rate = scaler.outAudioRate();
+        mediaData->channels = scaler.outAudioChannels();
+        mediaData->pts = packet->pts;
+        mediaData->duration = packet->duration;
+        AVStream *stream = pFormatCtx->streams[packet->stream_index];
+        mediaData->time_base_d = av_q2d(stream->time_base);
+        //帧数据
+        mediaData->data[0] = new unsigned char[bufferSize];
+        mediaData->datasize[0] = bufferSize;
+        memcpy(mediaData->data[0], sampleBuffer, bufferSize);
+        audioDataReady(mediaData);
+    } catch(...) {
+        LOG("audioDecodedData failed share data!");
+    }
+}
+
+void FFmpegMediaDecoder::videoScaledData(AVFrame *frame, AVPacket *packet, int pixelHeight)
+{
     try {
         std::shared_ptr<MediaData> mediaData(new MediaData);
         mediaData->pixel_format = scaler.outVideoFmt();
         mediaData->width = scaler.outVideoWidth();
-        mediaData->height = out_height;
+        mediaData->height = pixelHeight;
         mediaData->pts = packet->pts;
         mediaData->duration = packet->duration;
         mediaData->repeat_pict = frame->repeat_pict; //重复显示次数
@@ -251,17 +261,37 @@ void FFmpegMediaDecoder::videoDecodedData(AVFrame *frame, AVPacket *packet, int 
         //一帧图像（音频）的时间戳（时间戳一般以第一帧为0开始）
         //时间戳 = pts * (AVRational.num/AVRational.den)
         //int second= pFrame->pts * av_q2d(stream->time_base);
-        int y_size = scaler.outVideoWidth() * out_height;
-        int dataSize[] = {y_size, y_size / 4, y_size / 4};
-        for(int i=0; i<3; i++) {
-            mediaData->data[i] = new unsigned char[dataSize[i]];
-            mediaData->datasize[i] = dataSize[i];
-            mediaData->linesize[i] = pFrameYUV->linesize[i];
-            memcpy(mediaData->data[i], pFrameYUV->data[i], dataSize[i]);
+        if(scaler.outVideoFmt()==AV_PIX_FMT_YUV420P) {
+            fillPixelYUV420P(mediaData.get(), frame, scaler.outVideoWidth(), pixelHeight);
+        } else if(scaler.outVideoFmt()==AV_PIX_FMT_RGB24) {
+            fillPixelRGB24(mediaData.get(), frame, scaler.outVideoWidth(), pixelHeight);
         }
         videoDataReady(mediaData);
     } catch(...) {
         LOG("videoDecodedData failed share data!");
+    }
+}
+
+void FFmpegMediaDecoder::fillPixelRGB24(MediaData *mediaData, AVFrame *frame,
+                                        int pixelWidth, int pixelHeight)
+{
+    int numBytes = av_image_get_buffer_size(AV_PIX_FMT_RGB24, pixelWidth, pixelHeight, 0);
+    mediaData->data[0] = new unsigned char[numBytes];
+    mediaData->datasize[0] = numBytes;
+    mediaData->linesize[0] = frame->linesize[0];
+    memcpy(&(mediaData->data[0]), frame->data[0], numBytes);
+}
+
+void FFmpegMediaDecoder::fillPixelYUV420P(MediaData *mediaData, AVFrame *frame,
+                                         int pixelWidth, int pixelHeight)
+{
+    int y_size = pixelWidth * pixelHeight;
+    int dataSize[] = {y_size, y_size / 4, y_size / 4};
+    for(int i=0; i<3; i++) {
+        mediaData->data[i] = new unsigned char[dataSize[i]];
+        mediaData->datasize[i] = dataSize[i];
+        mediaData->linesize[i] = frame->linesize[i];
+        memcpy(mediaData->data[i], frame->data[i], dataSize[i]);
     }
 }
 
@@ -606,7 +636,7 @@ const char* FFmpegMediaDecoder::inputfile()
     char file[1024]={0};
 
     if(pFormatCtx&&pFormatCtx->url)
-        _memccpy(file, pFormatCtx->url, '\0', sizeof(file));
+        memcpy(file, pFormatCtx->url, sizeof(file));
 
     return file;
 }
@@ -618,7 +648,7 @@ enum FFmpegMediaDecoder::Status FFmpegMediaDecoder::status()
 
 void FFmpegMediaDecoder::setTag(const char* tag)
 {
-    sprintf_s(mTag, sizeof(mTag), "%s", tag);
+    sprintf(mTag, "%s", tag);
 }
 
 const char* FFmpegMediaDecoder::tag()
@@ -679,6 +709,6 @@ void FFmpegMediaDecoder::print_error(const char *name, int err)
         errbuf_ptr = strerror(AVUNERROR(err));
     av_log(NULL, AV_LOG_ERROR, "%s: %s\n", name, errbuf_ptr);
 
-    sprintf_s(message, sizeof(message), "(%s)%s", name, errbuf_ptr);
+    sprintf(message, "(%s)%s", name, errbuf_ptr);
     printError(err, message);
 }

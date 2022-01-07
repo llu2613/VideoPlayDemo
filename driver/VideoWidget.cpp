@@ -102,6 +102,9 @@ VideoWidget::VideoWidget(QWidget *parent)
     });
 
     smtAudioPlayer = SmtAudioPlayer::inst();
+    connect(smtAudioPlayer, &SmtAudioPlayer::audioCardOpened,
+            this, &VideoWidget::onAudioCardOpened);
+    smtAudioPlayer->initialize();
 //    SDL_AudioSpec audioSpec;
 //    audioSpec.freq = 48000;
 //    audioSpec.format = AUDIO_S16SYS;
@@ -189,3 +192,10 @@ void VideoWidget::onVideoData(std::shared_ptr<MediaData> mediaData)
     }
 }
 
+//声卡初始化完成
+void VideoWidget::onAudioCardOpened(QString name, int cardId)
+{
+    if(cardId==CardId) {
+        smtAudioPlayer->setCardVolume(CardId, 20);
+    }
+}

@@ -32,7 +32,8 @@ void StreamMediaDecoder::setOutVideo2(int width, int height)
 {
     enum AVPixelFormat fmt;
     mediaDecoder.getOutVideoParams(&fmt, NULL, NULL);
-    mediaDecoder.setOutVideo(fmt, width, height);
+//    mediaDecoder.setOutVideo(fmt, width, height);
+    mediaDecoder.setOutVideo(AV_PIX_FMT_RGB24, width, height);
 }
 
 AVSynchronizer* StreamMediaDecoder::getSynchronizer()

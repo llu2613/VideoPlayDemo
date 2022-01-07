@@ -1,4 +1,4 @@
-#include "SmtAudioPlayer.h"
+﻿#include "SmtAudioPlayer.h"
 #include <QDebug>
 
 #define MAX_BUF_MEM_SIZE (10*1024*1024)
@@ -30,12 +30,25 @@ SmtAudioPlayer::SmtAudioPlayer(QObject *parent)
             this, &SmtAudioPlayer::eventAudioDeviceAdded);
     connect(&mSdlEventDispatcher, &SdlEventDispatcher::audioDeviceRemoved,
             this, &SmtAudioPlayer::eventAudioDeviceRemoved);
-    mSdlEventDispatcher.start();
+    //mSdlEventDispatcher.start();
 }
 
 SmtAudioPlayer::~SmtAudioPlayer()
 {
+    for(int i=0; i<MAX_CARD_NUM; i++) {
+        closeCard(i);
+    }
+}
 
+void SmtAudioPlayer::initialize()
+{
+    if(!mSdlEventDispatcher.isRunning()) {
+        qDebug()<<"AudioSpec:"<<"freq"<<mAudioSpec.freq
+                   <<"channels"<<mAudioSpec.channels<<"silence"<<mAudioSpec.silence
+                  <<"samples"<<mAudioSpec.samples<<"format"<<mAudioSpec.format;
+
+        mSdlEventDispatcher.start();
+    }
 }
 
 void SmtAudioPlayer::setSync(int sourceId, AVSynchronizer *sync) {
@@ -93,6 +106,18 @@ void SmtAudioPlayer::setSourceOpen(int sourceId, bool isOpen)
         source.isOpenSound = isOpen;
         mSourceInfoMap.insert(sourceId, source);
     }
+}
+
+int SmtAudioPlayer::cardVolume(int cardId)
+{
+    int val = SdlAudioPlayer::volume(cardId);
+    return (int)(val*100.0f/MAX_CARD_VOLUME);
+}
+
+void SmtAudioPlayer::setCardVolume(int cardId, int volume)
+{
+    int val = (int)(volume*1.0f*MAX_CARD_VOLUME/100);
+    SdlAudioPlayer::setVolume(cardId, val);
 }
 
 QList<int> SmtAudioPlayer::getWaveformData(int sourceId)

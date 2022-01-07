@@ -1,10 +1,16 @@
-#include "RepeatableThread.h"
+﻿#include "RepeatableThread.h"
 
 RepeatableThread::RepeatableThread(RepRunnable *runnable)
 {
     mThread = nullptr;
     mRunnable = runnable;
     mIsRunning = false;
+
+    mThread = new QThread();
+    this->moveToThread(mThread);
+    connect(this, &RepeatableThread::thRun, this, &RepeatableThread::run, Qt::QueuedConnection);
+
+    mThread->start();
 }
 
 RepeatableThread::~RepeatableThread()
@@ -18,12 +24,6 @@ RepeatableThread::~RepeatableThread()
 
 void RepeatableThread::runTh()
 {
-    if(!mThread) {
-        mThread = new QThread();
-        this->moveToThread(mThread);
-        mThread->start();
-        connect(this, &RepeatableThread::thRun, this, &RepeatableThread::run);
-    }
     emit thRun();
 }
 

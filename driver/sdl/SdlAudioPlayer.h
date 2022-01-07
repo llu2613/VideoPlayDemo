@@ -1,4 +1,4 @@
-#ifndef SDLAUDIOPLAYER_H
+﻿#ifndef SDLAUDIOPLAYER_H
 #define SDLAUDIOPLAYER_H
 
 #include <list>
@@ -16,6 +16,7 @@ extern "C"{
 #undef main
 
 #define MAX_CARD_NUM 16
+#define MAX_CARD_VOLUME SDL_MIX_MAXVOLUME
 
 class SoundCard
 {
@@ -49,6 +50,8 @@ public:
     void pauseCard(int cardId, int ispause);
     void closeCard(int cardId);
     void addData(int cardId, int sourceId, Uint8 *buf, int bufLen, double timestamp);
+    int volume(int cardId);
+    void setVolume(int cardId, int volume);
     void clearCardData(int cardId);
     void clearSourceData(int sourceId);
     void clearData(int cardId, int sourceId);

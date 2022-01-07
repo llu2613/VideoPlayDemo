@@ -1,8 +1,11 @@
-#include "FFmpegFileMerger.h"
+﻿#include "FFmpegFileMerger.h"
 #include <QDir>
 #include <QFile>
 #include <QDebug>
 
+/**
+ * 合并ts流
+ */
 FFmpegFileMerger::FFmpegFileMerger()
 {
     has_opened = false;
@@ -30,14 +33,17 @@ void FFmpegFileMerger::start(std::string out_file)
 
 int FFmpegFileMerger::merge(std::string in_file)
 {
+    int ret=0;
     if(open(in_file.c_str(), NULL, false)>=0) {
         if(!has_opened) {
-            openOutput();
+            ret = openOutput();
         }
-        while(decoding()>=0);
+        if(ret>=0) {
+            while((ret=decoding())>=0);
+        }
         close();
     }
-    return 0;
+    return ret;
 }
 
 void FFmpegFileMerger::finish()
@@ -127,17 +133,12 @@ int FFmpegFileMerger::openOutput()
     extra_video_data = true;
 
     if(!out_file.size()) {
-        const char* in_file_c = inputfile();
-        char fi[256], fi2[256];
-        if(strlen(in_file_c)) {
-            memccpy(fi, in_file_c, '.', strlen(in_file_c)+1);
-            sprintf(fi2, "%s%s", fi, "mp4");
-            out_file = fi2;
-        }
+        printf("openOutput out_file is empty!\n");
+        return -1;
     }
 
     const char *output_filename = out_file.c_str();
-    int error = avformat_alloc_output_context2(&output_format_ctx, NULL, "mp4",output_filename);
+    int error = avformat_alloc_output_context2(&output_format_ctx,NULL,NULL,output_filename);
     if(error != 0)
     {
         printf("avformat_open_input file error\n");
@@ -240,8 +241,10 @@ int FFmpegFileMerger::openOutput()
 void FFmpegFileMerger::closeOutput()
 {
     if(output_format_ctx) {
-        av_write_trailer(output_format_ctx);
-        avio_close(output_format_ctx->pb);
+        if(has_opened) {
+            av_write_trailer(output_format_ctx);
+            avio_close(output_format_ctx->pb);
+        }
         avformat_free_context(output_format_ctx);
         output_format_ctx = nullptr;
     }
@@ -286,7 +289,7 @@ void FFmpegFileMerger::run(std::list<std::string> in_files, std::string out_file
 
 void FFmpegFileMerger::test()
 {
-#if 1
+#if 0
     QDir cfgPathDir = QDir("D:\\test\\devrecorda02c237ee64441e5b90f5e6c7ab616cf2");
     if(!cfgPathDir.exists()){
         return;
@@ -326,4 +329,17 @@ void FFmpegFileMerger::test()
 //    merger.merge(list, "D:\\test\\qinghuaci_ts\\merged.mp4");
 #endif
 
+    start("D:\\test\\hls-\\outfile.mp4");
+    merge("http://192.168.1.60:9080/m3u8file/969DB99A-535D-42C5-B2C3-6A93926435751836.m3u8");
+    finish();
+}
+
+void FFmpegFileMerger::test2()
+{
+    int ret;
+    const char fl[] = "http://192.168.1.60:9080/m3u8file/969DB99A-535D-42C5-B2C3-6A93926435751283.m3u8";
+    if(open(fl, NULL, false)>=0) {
+        while((ret=decoding())>=0);
+        close();
+    }
 }

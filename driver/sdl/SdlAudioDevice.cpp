@@ -1,4 +1,4 @@
-#include "SdlAudioDevice.h"
+﻿#include "SdlAudioDevice.h"
 #include <memory>
 #include <QDebug>
 
@@ -12,6 +12,7 @@
 SdlAudioDevice::SdlAudioDevice(int iscapture)
 {
     mDeviceId = 0;
+    mMixVolume = SDL_MIX_MAXVOLUME;
     mLimitMemory = MAX_FRAME_MEM;
     mIscapture = iscapture?SDL_TRUE:SDL_FALSE;
     SDL_zero(mDesiredSpec);
@@ -122,6 +123,22 @@ void SdlAudioDevice::addData(int index, Uint8* buf, int len,
     }
 }
 
+int SdlAudioDevice::mixVolume()
+{
+    return mMixVolume;
+}
+
+void SdlAudioDevice::setMixVolume(int volume)
+{
+    if(volume<0) {
+        mMixVolume = 0;
+    } else if(volume>SDL_MIX_MAXVOLUME) {
+        mMixVolume = SDL_MIX_MAXVOLUME;
+    } else {
+        mMixVolume = volume;
+    }
+}
+
 std::list<int> SdlAudioDevice::indexs()
 {
     LockedMapLocker lk(mDataMap.mutex());
@@ -210,7 +227,7 @@ int SdlAudioDevice::take(Uint8 *stream, int len)
         int cpLen = takeIndex(index, data.get(), len);
         if(cpLen) {
             SDL_MixAudioFormat(stream, data.get(),
-                               mDesiredSpec.format, cpLen, SDL_MIX_MAXVOLUME);
+                               mDesiredSpec.format, cpLen, mMixVolume);
             dataCnt++;
         }
     }

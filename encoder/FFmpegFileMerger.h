@@ -1,4 +1,4 @@
-#ifndef FFMPEGFILEMERGER_H
+﻿#ifndef FFMPEGFILEMERGER_H
 #define FFMPEGFILEMERGER_H
 
 #include <list>
@@ -20,6 +20,7 @@ public:
     void finish();
 
     void test();
+    void test2();
 
 protected:
     int audioRawFrame(AVCodecContext *pCodecCtx, AVFrame *frame, AVPacket *packet);

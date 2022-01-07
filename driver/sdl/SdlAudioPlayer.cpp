@@ -1,4 +1,4 @@
-#include "SdlAudioPlayer.h"
+﻿#include "SdlAudioPlayer.h"
 #include <string.h>
 #include <QDebug>
 
@@ -49,7 +49,8 @@ void SdlAudioPlayer::audioCallback(void *data, Uint8 *stream, int len)
                  it!=dataMap.end(); ++it) {
             std::shared_ptr<SampleBuffer> buffer = it->second;
             SDL_MixAudioFormat(stream, buffer->data(),
-                               card->device->format(), buffer->len(), SDL_MIX_MAXVOLUME);
+                               card->device->format(), buffer->len(),
+                               card->device->mixVolume());
         }
     }
     card->mutex.unlock();
@@ -126,6 +127,47 @@ void SdlAudioPlayer::addData(int cardId, int sourceId, Uint8 *buf, int bufLen,
         WARNING("SoundCard %d is disable!", cardId);
     }
     card.mutex.unlock();
+}
+
+void SdlAudioPlayer::setVolume(int cardId, int volume)
+{
+    if(cardId>=0&&cardId<MAX_CARD_NUM) {
+    } else {
+        WARNING("Invalid sound card id:%d", cardId);
+        return;
+    }
+
+    SoundCard &card = mCardArray[cardId];
+
+    card.mutex.lock();
+    if(card.device) {
+        card.device->setMixVolume(volume);
+    } else {
+        INFO("Sound card is not initiailizing, cardId:%d", cardId);
+    }
+    card.mutex.unlock();
+}
+
+int SdlAudioPlayer::volume(int cardId)
+{
+    if(cardId>=0&&cardId<MAX_CARD_NUM) {
+    } else {
+        WARNING("Invalid sound card id:%d", cardId);
+        return 0;
+    }
+
+    int val = 0;
+    SoundCard &card = mCardArray[cardId];
+
+    card.mutex.lock();
+    if(card.device) {
+        val = card.device->mixVolume();
+    } else {
+        INFO("Sound card is not initiailizing, cardId:%d", cardId);
+    }
+    card.mutex.unlock();
+
+    return val;
 }
 
 void SdlAudioPlayer::clearData(int cardId, int sourceId)

@@ -40,6 +40,39 @@
      <string>停止</string>
     </property>
    </widget>
+   <widget class="QWidget" name="widget" native="true">
+    <property name="geometry">
+     <rect>
+      <x>120</x>
+      <y>50</y>
+      <width>201</width>
+      <height>78</height>
+     </rect>
+    </property>
+    <layout class="QVBoxLayout" name="verticalLayout">
+     <item>
+      <widget class="QRadioButton" name="radioBtn_softwareOpenGL">
+       <property name="text">
+        <string>AA_UseSoftwareOpenGL</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QRadioButton" name="radioBtn_desktopOpenGL">
+       <property name="text">
+        <string>AA_UseDesktopOpenGL</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QRadioButton" name="radioBtn_openGLES">
+       <property name="text">
+        <string>AA_UseOpenGLES</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </widget>
   </widget>
   <widget class="QMenuBar" name="menuBar">
    <property name="geometry">

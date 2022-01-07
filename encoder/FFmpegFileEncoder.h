@@ -1,4 +1,4 @@
-#ifndef FFMPEGFILEENCODER_H
+﻿#ifndef FFMPEGFILEENCODER_H
 #define FFMPEGFILEENCODER_H
 
 extern "C" {
@@ -79,7 +79,7 @@ private:
 	int init_filters(void);
 	void print_error(const char *name, int err);
 	void print_packet(const AVFormatContext *fmt_ctx, const AVPacket *pkt);
-	int encode_write_frame(AVFrame *filt_frame, unsigned int stream_index, int *got_frame=0);
+    int encode_write_frame(AVFrame *filt_frame, unsigned int stream_index);
 	int filter_encode_write_frame(AVFrame *frame, unsigned int stream_index);
 	int flush_encoder(unsigned int stream_index);
 

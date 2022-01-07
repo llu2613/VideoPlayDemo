@@ -39,6 +39,7 @@ release32/
 release64/
 .qmake.stash
 *.pdb
+*.db
 VideoPlayDemo.pro.user
 VideoPlayDemo.pro.user.*
 VideoPlayDemo.vcxproj
