@@ -120,7 +120,8 @@ HEADERS += \
     encoder/FFmpegAudioRecorder.h \
     decoder/M3u8Parsing.h \
     encoder/FFmpegAudioRecorder.h \
-    encoder/FFmpegAudioMerger.h
+    encoder/FFmpegAudioMerger.h \
+    encoder/FFMergerCallback.h
 
 FORMS += \
         mainwindow.ui

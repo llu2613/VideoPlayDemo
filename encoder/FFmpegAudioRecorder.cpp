@@ -1,4 +1,4 @@
-﻿#include "ffmpegaudiorecorder.h"
+﻿#include "FFmpegAudioRecorder.h"
 
 FFmpegAudioRecorder::FFmpegAudioRecorder()
 {

@@ -1,5 +1,6 @@
 ﻿#include "FFmpegAudioMerger.h"
 #include <iostream>
+#include <QDebug>
 
 using namespace std;
 
@@ -17,6 +18,9 @@ static void ff_log_callback(void *avcl, int level, const char *fmt,
 FFmpegAudioMerger::FFmpegAudioMerger()
 {
     has_opened = false;
+    mCallback = nullptr;
+    duration = 0;
+    samples = 0;
 
     av_log_set_level(AV_LOG_WARNING);
 //    av_log_set_callback(ff_log_callback);
@@ -25,6 +29,13 @@ FFmpegAudioMerger::FFmpegAudioMerger()
 FFmpegAudioMerger::~FFmpegAudioMerger()
 {
 
+}
+
+void FFmpegAudioMerger::setCallback(FFMergerCallback *callback)
+{
+    std::lock_guard<std::mutex> lk(m_mutex);
+
+    mCallback = callback;
 }
 
 void FFmpegAudioMerger::start(std::string out_file)
@@ -36,14 +47,30 @@ int FFmpegAudioMerger::merge(std::string in_file)
 {
     int ret=0;
     if(open(in_file.c_str(), NULL, false)>=0) {
+        //计算时长
+        const AVStream *st = audioStream();
+        const AVFormatContext* ctx = formatContext();
+        if(ctx&&ctx->duration!=AV_NOPTS_VALUE) {
+            duration = ctx->duration/AV_TIME_BASE;
+            samples = 0;
+        } else if(st) {
+            duration = st->duration*st->time_base.num/st->time_base.den;
+            samples = 0;
+        }
+
         if(!has_opened) {
             ret = openOutput();
+            if(ret<0)
+                print_error(ret, "Canot open output file!");
         }
         if(ret>=0) {
             while((ret=decoding())>=0);
         }
         close();
+    } else {
+        print_error(0, "Canot open input file!");
     }
+
     return ret;
 }
 
@@ -54,14 +81,50 @@ void FFmpegAudioMerger::finish()
     }
 }
 
+int FFmpegAudioMerger::audioRawFrame(AVCodecContext *pCodecCtx, AVFrame *frame, AVPacket *packet)
+{
+    return FFmpegMediaDecoder::audioRawFrame(pCodecCtx, frame, packet);
+}
+
+int FFmpegAudioMerger::videoRawFrame(AVCodecContext *pCodecCtx, AVFrame *frame, AVPacket *packet)
+{
+    return 0;
+}
+
 void FFmpegAudioMerger::audioDecodedData(AVFrame *frame, AVPacket *packet)
 {
     mRecoder.addData(frame, packet);
+
+    //计算进度
+    const AVCodecContext * codec = audioCodecContext();
+    if(codec) {
+        samples += frame->nb_samples;
+        const int64_t seconds = samples/codec->sample_rate;
+        progress(seconds, duration);
+    }
 }
 
 void FFmpegAudioMerger::videoDecodedData(AVFrame *frame, AVPacket *packet, int pixelHeight)
 {
     return;
+}
+
+void FFmpegAudioMerger::progress(long current, long total)
+{
+    std::lock_guard<std::mutex> lk(m_mutex);
+
+    if(mCallback) {
+        mCallback->onMergerProgress(current, total);
+    }
+}
+
+void FFmpegAudioMerger::print_error(int code, std::string msg)
+{
+    std::lock_guard<std::mutex> lk(m_mutex);
+
+    if(mCallback) {
+        mCallback->onMergerError(code, msg);
+    }
 }
 
 int FFmpegAudioMerger::openOutput()

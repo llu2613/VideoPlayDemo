@@ -7,6 +7,21 @@
 #include "encoder/FFmpegAudioMerger.h"
 #include "decoder/m3u8parsing.h"
 
+class FFAudioMerger : public FFmpegAudioMerger, private FFMergerCallback
+{
+public:
+    FFAudioMerger() {
+        setCallback(this);
+    }
+    void onMergerProgress(long current, long total) {
+        qDebug("#current:%ld duration:%ld, %d%%",
+               current, total, (int)(100*current/total));
+    }
+    void onMergerError(int code, std::string msg) {
+
+    }
+};
+
 void useOpenGLMode(int openGLMode)
 {
     // webengine设置,必须在QApplication之前运行
@@ -39,12 +54,13 @@ void useOpenGLMode(int openGLMode)
 
 int main(int argc, char *argv[])
 {
-    M3u8Parsing parsing;
-    parsing.test();
-//    FFmpegAudioMerger merger;
-//    merger.start("D:/test/out_recoder_audio01.mp3");
-//    merger.merge("D:/test/qinghuaci.mp4");
-//    merger.finish();
+//    M3u8Parsing parsing;
+//    parsing.test();
+
+    FFAudioMerger merger;
+    merger.start("D:/test/out_recoder_audio02.mp3");
+    merger.merge("http://192.168.1.57:9080/m3u8file/8CBFA051-9BEE-4728-8CEF-F8083C4F9C4D1106.m3u8");
+    merger.finish();
 
 //    useOpenGLMode(2);
 

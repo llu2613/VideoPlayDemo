@@ -659,10 +659,17 @@ const char* FFmpegMediaDecoder::tag()
 void FFmpegMediaDecoder::printCodecInfo(AVCodecContext *pCodeCtx)
 {
     if(pCodeCtx->codec_type==AVMEDIA_TYPE_AUDIO) {
+        int64_t streamDuration = 0;
+        if(audio_stream_idx>=0 && audio_stream_idx<pFormatCtx->nb_streams) {
+             AVStream *stream = pFormatCtx->streams[audio_stream_idx];
+             streamDuration = stream->duration * stream->time_base.num / stream->time_base.den;
+        }
         //输出音频信息
         AVCodec *pCodec = avcodec_find_decoder(pCodeCtx->codec_id);
         LOG("audio file format: %s",pFormatCtx->iformat->name);
-        LOG("audio duration: %d", (pFormatCtx->duration)/1000000);
+        LOG("audio duration: %d", (pFormatCtx->duration!=AV_NOPTS_VALUE)?
+                (pFormatCtx->duration/AV_TIME_BASE):0);
+        LOG("audio stream duration: %d", streamDuration);
         LOG("audio channels: (lt:%d) %d", pCodeCtx->channel_layout, pCodeCtx->channels);
         LOG("audio sample rate: %d",pCodeCtx->sample_rate);
         LOG("audio sample accuracy: (fmt:%d) %d",pCodeCtx->sample_fmt,
@@ -671,14 +678,30 @@ void FFmpegMediaDecoder::printCodecInfo(AVCodecContext *pCodeCtx)
         if(pCodec)
             LOG("audio decode name: %s", pCodec->name);
     } else if(pCodeCtx->codec_type==AVMEDIA_TYPE_VIDEO) {
+        int64_t streamDuration = 0;
+        if(video_stream_idx>=0 && video_stream_idx<pFormatCtx->nb_streams) {
+             AVStream *stream = pFormatCtx->streams[video_stream_idx];
+             streamDuration = stream->duration * stream->time_base.num / stream->time_base.den;
+        }
         //输出视频信息
         AVCodec *pCodec = avcodec_find_decoder(pCodeCtx->codec_id);
         LOG("video file format: %s",pFormatCtx->iformat->name);
-        LOG("video duration: %d", (pFormatCtx->duration)/1000000);
+        LOG("video duration: %d", (pFormatCtx->duration!=AV_NOPTS_VALUE)?
+                (pFormatCtx->duration/AV_TIME_BASE):0);
+        LOG("video stream duration: %d", streamDuration);
         LOG("video frame pixel format: %d", pCodeCtx->pix_fmt);
         LOG("video frame size: %d,%d",pCodeCtx->width, pCodeCtx->height);
         if(pCodec)
             LOG("video decode name: %s", pCodec->name);
+        if(pCodeCtx->extradata&&pCodeCtx->extradata_size) {
+            char *buf = (char*)av_malloc(pCodeCtx->extradata_size+1);
+            if(buf) {
+                memcpy(buf, pCodeCtx->extradata, pCodeCtx->extradata_size);
+                buf[pCodeCtx->extradata_size] = '\0';
+                LOG("video extradata: %s", buf);
+                av_freep(&buf);
+            }
+        }
     }
 }
 
