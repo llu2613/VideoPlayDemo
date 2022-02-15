@@ -13,6 +13,10 @@ public:
     virtual ~FFmpegAudioMerger();
 
     void start(std::string out_file);
+    void start(std::string out_file,
+               int64_t  out_ch_layout,
+               enum AVSampleFormat out_sample_fmt,
+               int out_sample_rate);
 
     void setCallback(FFMergerCallback *callback);
 
@@ -35,6 +39,9 @@ private:
 
     std::mutex m_mutex;
     std::string out_file;
+    int64_t out_ch_layout;
+    enum AVSampleFormat out_sample_fmt;
+    int out_sample_rate;
 
     bool has_opened;
     FFmpegAudioRecorder mRecoder;

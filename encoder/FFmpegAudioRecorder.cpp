@@ -85,9 +85,116 @@ int FFmpegAudioRecorder::open(const char *output,
     enc_ctx->sample_rate = src_sample_rate;
     enc_ctx->bit_rate = enc_ctx->sample_rate*enc_ctx->channels*bit_depth;
 
-    if (avcodec_open2(enc_ctx,pCodec,NULL) < 0){
+    ret = avcodec_open2(enc_ctx,pCodec,NULL);
+    if (ret < 0){
         av_log(NULL,AV_LOG_ERROR,"fail to open codec\n");
+        return ret;
+    }
+    ret = avcodec_parameters_from_context(out_stream->codecpar, enc_ctx);
+    if (ret < 0) {
+        av_log(NULL, AV_LOG_ERROR, "Failed to copy encoder parameters to out_stream\n");
+        return ret;
+    }
+    av_dump_format(ofmt_ctx,0,output,1);
+
+    if(!enc_ctx->frame_size)
+        enc_ctx->frame_size = enc_ctx->sample_rate;
+
+    //新版本需要使用到转换参数，将读取的数据转换成输出的编码格式
+    audio_data = (uint8_t**)av_calloc( enc_ctx->channels,sizeof(*audio_data) );
+    audio_data_size = av_samples_alloc(audio_data,NULL,enc_ctx->channels,
+                                       enc_ctx->frame_size*2,enc_ctx->sample_fmt,1);
+
+    swr_ctx  = swr_alloc();
+    swr_alloc_set_opts(swr_ctx,enc_ctx->channel_layout,
+                       enc_ctx->sample_fmt,enc_ctx->sample_rate,
+                       src_ch_layout,src_sample_fmt,src_sample_rate,0,NULL);
+//    printf("swr o: chlt %d fmt %d rate %d, i: chlt %d fmt %d rate %d\n",
+//           enc_ctx->channel_layout, enc_ctx->sample_fmt,enc_ctx->sample_rate,
+//           src_ch_layout,src_sample_fmt,src_sample_rate);
+    ret = swr_init(swr_ctx);
+    if(ret<0) {
+        av_log(NULL,AV_LOG_ERROR,"fail to swr_init\n");
         return -1;
+    }
+
+    audio_fifo = av_audio_fifo_alloc(enc_ctx->sample_fmt, enc_ctx->channels, enc_ctx->frame_size);
+    if (audio_fifo == NULL) {
+        av_log(NULL, AV_LOG_ERROR, "Could not allocate FIFO\n");
+        return AVERROR(ENOMEM);
+    }
+
+    if (avio_open(&ofmt_ctx->pb,output,AVIO_FLAG_WRITE) < 0){
+        av_log(NULL,AV_LOG_ERROR,"fail to open output\n");
+        return -1;
+    }
+    if (avformat_write_header(ofmt_ctx,NULL) < 0){
+        av_log(NULL,AV_LOG_ERROR,"fail to write header");
+        return -1;
+    }
+
+    audio_pts = 0;
+
+    return 0;
+}
+
+int FFmpegAudioRecorder::open(const char *output,
+                              int64_t  src_ch_layout,
+                              enum AVSampleFormat src_sample_fmt,
+                              int src_sample_rate,
+                              int64_t  out_ch_layout,
+                              enum AVSampleFormat out_sample_fmt,
+                              int out_sample_rate)
+{
+    if(ofmt_ctx) {
+        printf("ofmt_ctx has been inited, please close first!\n");
+        return 0;
+    }
+
+    int ret = 0;
+    ofmt_ctx = avformat_alloc_context();
+    AVOutputFormat *oformat = av_guess_format(NULL,output,NULL);
+    if (oformat==NULL){
+        av_log(NULL,AV_LOG_ERROR,"fail to find the output format\n");
+        return -1;
+    }
+    if (avformat_alloc_output_context2(&ofmt_ctx,oformat,oformat->name,output) <0){
+        av_log(NULL,AV_LOG_ERROR,"fail to alloc output context\n");
+        return -1;
+    }
+    out_stream = avformat_new_stream(ofmt_ctx,NULL);
+    if (out_stream == NULL){
+        av_log(NULL,AV_LOG_ERROR,"fail to create new stream\n");
+        return -1;
+    }
+
+    AVCodec *pCodec = avcodec_find_encoder(oformat->audio_codec);
+    if (pCodec == NULL){
+        av_log(NULL,AV_LOG_ERROR,"fail to find codec\n");
+        return -1;
+    }
+
+    enc_ctx = avcodec_alloc_context3(pCodec);
+    if (!enc_ctx) {
+        av_log(NULL, AV_LOG_ERROR, "failed to allocate the encoder context\n");
+        return -1;
+    }
+
+    const int bit_depth = 32;
+    AVSampleFormat sample_fmt = out_sample_fmt!=AV_SAMPLE_FMT_NONE?
+                out_sample_fmt:pCodec->sample_fmts[0];
+    //enc_ctx->codec_id = oformat->audio_codec;
+    enc_ctx->codec_type = AVMEDIA_TYPE_AUDIO;
+    enc_ctx->sample_fmt = sample_fmt;
+    enc_ctx->channel_layout = out_ch_layout!=FF_INVALID?out_ch_layout:src_ch_layout;
+    enc_ctx->channels = av_get_channel_layout_nb_channels(enc_ctx->channel_layout);
+    enc_ctx->sample_rate = out_sample_rate!=FF_INVALID?out_sample_rate:src_sample_rate;
+    enc_ctx->bit_rate = enc_ctx->sample_rate*enc_ctx->channels*bit_depth;
+
+    ret = avcodec_open2(enc_ctx,pCodec,NULL);
+    if (ret < 0){
+        av_log(NULL,AV_LOG_ERROR,"fail to open codec\n");
+        return ret;
     }
     ret = avcodec_parameters_from_context(out_stream->codecpar, enc_ctx);
     if (ret < 0) {
@@ -299,7 +406,7 @@ int FFmpegAudioRecorder::encode_write_frame(AVFrame *filt_frame, unsigned int st
 void FFmpegAudioRecorder::close()
 {
     //刷新编码器的缓冲区
-    if(ofmt_ctx&&enc_ctx) {
+    if(ofmt_ctx&&ofmt_ctx->pb&&enc_ctx) {
         flush_encoder(ofmt_ctx,out_stream->index);
         av_write_trailer(ofmt_ctx);
     }

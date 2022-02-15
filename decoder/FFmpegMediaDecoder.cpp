@@ -8,7 +8,7 @@
 //20s超时退出
 #define INTERRUPT_TIMEOUT (10 * 1000 * 1000)
 
-int interrupt_callback(void *pCtx)
+static int interrupt_callback(void *pCtx)
 {
     FFmpegMediaDecoder *pThis = (FFmpegMediaDecoder*)pCtx;
     if(pThis->diffLastFrame(av_gettime()) > pThis->interruptTimeout()){ //INTERRUPT_TIMEOUT
@@ -357,6 +357,7 @@ AVHWAccel *FFmpegMediaDecoder::findHwaccel(enum AVCodecID codec_id, enum AVPixel
 	}
 	return NULL;
 }
+
 int FFmpegMediaDecoder::openHwCodec(AVFormatContext *pFormatCtx, int stream_idx,
 									AVCodecContext **pCodeCtx)
 {
@@ -366,7 +367,11 @@ int FFmpegMediaDecoder::openHwCodec(AVFormatContext *pFormatCtx, int stream_idx,
 	if (!(*pCodeCtx))
 		avcodec_free_context(pCodeCtx);
 
-	findHwaccel(pCodecPar->codec_id, (enum AVPixelFormat)pCodecPar->format);
+//	findHwaccel(pCodecPar->codec_id, (enum AVPixelFormat)pCodecPar->format);
+
+    AVHWAccel *hwaccel = findHwaccel(pCodecPar->codec_id, (enum AVPixelFormat)pCodecPar->format);
+    //    avctx->hwaccel = ff_find_hwaccel(avctx->codec->id, avctx->pix_fmt);
+
 	//AVCodec *pCodec = avcodec_find_decoder_by_name("h264_qsv");//Intel核心显卡
 	//if (!pCodec) pCodec = avcodec_find_decoder_by_name("h264_nvenc");//英伟达显卡
 	AVCodec *pCodec = avcodec_find_decoder(pCodecPar->codec_id);

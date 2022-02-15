@@ -1,5 +1,5 @@
-#ifndef FFAVIOCONTEXTHANDLE_H
-#define FFAVIOCONTEXTHANDLE_H
+#ifndef FFAVIOCONTEXT_H
+#define FFAVIOCONTEXT_H
 
 #include <stdint.h>
 
@@ -13,11 +13,11 @@ extern "C" {
 #include "libavutil/time.h"
 }
 
-class FFAvioContextHandle
+class FFAvioContext
 {
 public:
-    FFAvioContextHandle(int bufferSize);
-    ~FFAvioContextHandle();
+    FFAvioContext(int bufferSize);
+    ~FFAvioContext();
 
     int probe(const char *url);
 
@@ -28,4 +28,4 @@ private:
     int ioBufferSize;
 };
 
-#endif // FFAVIOCONTEXTHANDLE_H
+#endif // FFAVIOCONTEXT_H

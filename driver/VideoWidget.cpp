@@ -12,7 +12,7 @@
 #define CardId 0
 
 VideoWidget::VideoWidget(QWidget *parent)
-    : QDialog(parent), videoBuffer("VideoWidget")
+    : QDialog(parent)/*, videoBuffer("VideoWidget")*/
 {
     mSourceId = 0;
     setFixedSize(VIDEO_W+80, VIDEO_H+150);
@@ -36,10 +36,10 @@ VideoWidget::VideoWidget(QWidget *parent)
     QObject::connect(decoder, &StreamMediaDecoder::videoData,
                      this, &VideoWidget::onVideoData);
 
-    connect(&videoBuffer, &VideoBuffer::showFrame,
-            this, &VideoWidget::onShowVideoData);
-    videoBuffer.setSync(decoder->getSynchronizer());
-    videoBuffer.start();
+//    connect(&videoBuffer, &VideoBuffer::showFrame,
+//            this, &VideoWidget::onShowVideoData);
+//    videoBuffer.setSync(decoder->getSynchronizer());
+//    videoBuffer.start();
 
     sizeList<<QSize(1920,1080)<<QSize(1280,720)<<QSize(640,480)
            <<QSize(832,480)<<QSize(416,240)
@@ -50,15 +50,15 @@ VideoWidget::VideoWidget(QWidget *parent)
     qDebug()<<"QSurfaceFormat version:"<<format.version().first<<format.version().second;
     format.setProfile(QSurfaceFormat::CoreProfile);
     format.setVersion(3, 3); // Adapt to your system
-    video = new YUVGLWidget(format);
-    video->setFrameSize(VIDEO_W, VIDEO_H);
+//    video = new YUVGLWidget(format);
+//    video->setFrameSize(VIDEO_W, VIDEO_H);
 
 //    video = new XVideoWidget;
 //    video->InitDrawBuffer(1280*720+1280*720/2);
 
 //    video = new I420PlayerWidget;
     QVBoxLayout* pVLayout = new QVBoxLayout(this);
-    pVLayout->addWidget(video);
+//    pVLayout->addWidget(video);
 //    video->setFixedSize(1280, 720);
 
     QHBoxLayout* pHLayout = new QHBoxLayout(this);
@@ -72,11 +72,11 @@ VideoWidget::VideoWidget(QWidget *parent)
                      .arg(sizeList[i].height()));
     }
 
-    inputUrl->setText("http://220.161.87.62:8800/hls/0/index.m3u8");
+//    inputUrl->setText("http://220.161.87.62:8800/hls/0/index.m3u8");
 //    inputUrl->setText("http://192.168.31.233:9080/m3u8file/A02C237E-E644-41E5-B90F-5E6C7AB616CF1885.m3u8");
 //    inputUrl->setText("http://192.168.31.233:9000/devrecorda02c237ee64441e5b90f5e6c7ab616cf1/19700101084735036-1-3-A02C237E-E644-41E5-B90F-5E6C7AB616CF-0100811318.ts");
 //    inputUrl->setText("rtsp://admin:abc123456@192.168.1.165:554/h264/ch1/main/av_stream");
-//    inputUrl->setText("rtsp://192.168.31.182/audiotracker_1");
+    inputUrl->setText("rtsp://192.168.1.151/audiotracker_1");
     pHLayout->addWidget(inputUrl);
     pHLayout->addWidget(openBtn);
     pHLayout->addWidget(closeBtn);
@@ -93,12 +93,12 @@ VideoWidget::VideoWidget(QWidget *parent)
     connect(closeBtn, &QPushButton::clicked, [this](){
         decoder->stopPlay();
         smtAudioPlayer->clearSourceData(mSourceId);
-        videoBuffer.clear();
+//        videoBuffer.clear();
     });
     connect(sizeBox, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
             [this](int index){
         QSize size = sizeList[index];
-        video->setFixedSize(size);
+//        video->setFixedSize(size);
     });
 
     smtAudioPlayer = SmtAudioPlayer::inst();
@@ -139,7 +139,7 @@ void VideoWidget::closeEvent(QCloseEvent *e)
 void VideoWidget::onShowVideoData(std::shared_ptr<MediaData> data)
 {
 #if 1
-    video->repaintView(data.get());
+//    video->repaintView(data.get());
 #else
     int y_size = mediaData->width * mediaData->height;
     int bufSize = y_size+y_size/2;
@@ -186,7 +186,7 @@ void VideoWidget::onAudioData(std::shared_ptr<MediaData> mediaData)
 void VideoWidget::onVideoData(std::shared_ptr<MediaData> mediaData)
 {
     if(mediaData->pixel_format==AV_PIX_FMT_YUV420P) {
-        videoBuffer.addData(mediaData.get());
+//        videoBuffer.addData(mediaData.get());
     } else {
         qDebug()<<"Unsupported video format:"<<mediaData->pixel_format;
     }

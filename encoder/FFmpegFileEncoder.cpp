@@ -146,7 +146,7 @@ int FFmpegFileEncoder::open_output_file(const char *filename)
 			if (!enc_ctx) {
 				av_log(NULL, AV_LOG_FATAL, "Failed to allocate the encoder context\n");
 				return AVERROR(ENOMEM);
-			}
+            }
 
 			/* In this example, we transcode to same properties (picture size,
 			* sample rate etc.). These properties can be changed for output
@@ -166,13 +166,16 @@ int FFmpegFileEncoder::open_output_file(const char *filename)
 				enc_ctx->time_base.den = 25; //fix 25 fps
 			}
 			else {
+                enc_ctx->channel_layout = dec_ctx->channel_layout;
+                enc_ctx->sample_rate = dec_ctx->sample_rate;
+
 				if (encoder->id == AV_CODEC_ID_OPUS) {
 					enc_ctx->sample_rate = 48000;
-				} else {
-					enc_ctx->sample_rate = dec_ctx->sample_rate;
+                } else if(encoder->id == AV_CODEC_ID_VORBIS) {
+                    enc_ctx->strict_std_compliance = -2;
+                    enc_ctx->channel_layout = AV_CH_LAYOUT_STEREO;
                 }
-				enc_ctx->channel_layout = dec_ctx->channel_layout?dec_ctx->channel_layout:
-						av_get_default_channel_layout(dec_ctx->channels);
+
 				enc_ctx->channels = av_get_channel_layout_nb_channels(enc_ctx->channel_layout);
 				/* take first format from list of supported formats */
 				enc_ctx->sample_fmt = encoder->sample_fmts[0];
@@ -182,11 +185,11 @@ int FFmpegFileEncoder::open_output_file(const char *filename)
 			}
 
 			/* Third parameter can be used to pass settings to encoder */
-			ret = avcodec_open2(enc_ctx, encoder, NULL);
+            ret = avcodec_open2(enc_ctx, encoder, NULL);
 			if (ret < 0) {
 				av_log(NULL, AV_LOG_ERROR, "Cannot open video encoder for stream #%u\n", i);
 				return ret;
-			}
+            }
 			ret = avcodec_parameters_from_context(out_stream->codecpar, enc_ctx);
 			if (ret < 0) {
 				av_log(NULL, AV_LOG_ERROR, "Failed to copy encoder parameters to output stream #%u\n", i);
@@ -809,8 +812,11 @@ int FFmpegFileEncoder::flush_encoder(unsigned int stream_index)
 	int ret;
 
 	if (!(stream_ctx[stream_index].enc_ctx->codec->capabilities &
-		AV_CODEC_CAP_DELAY))
-		return 0;
+          AV_CODEC_CAP_DELAY)) {
+        printf("#%d enc_ctx->codec->capabilities=%d", stream_index,
+               stream_ctx[stream_index].enc_ctx->codec->capabilities);
+        return 0;
+    }
 
     for(int i=0; i<100; i++) {
 		//av_log(NULL, AV_LOG_INFO, "Flushing stream #%u encoder\n", stream_index);
@@ -826,14 +832,14 @@ int FFmpegFileEncoder::test()
 {
 #if 0
 	//输入要进行格式转换的文件
-    char intput_file[] = "http://192.168.1.60:9080/m3u8file/969DB99A-535D-42C5-B2C3-6A93926435751283.m3u8";
+    char intput_file[] = "D:\\test\\A02C237E-E644-41E5-B90F-5E6C7AB616CF_1642743787.flv";
 	//输出转换后的文件
-    char output_file[] = "D:\\test\\qinghuaci_out0_.mp4";
+    char output_file[] = "D:\\test\\A02C237E_out_.webm";
 #else //网络文件
 	//输入要进行格式转换的文件
     char intput_file[] = "D:\\test\\qinghuaci.mp4";
 	//输出转换后的文件
-    char output_file[] = "D:\\test\\qinghuaci_out2.webm";
+    char output_file[] = "D:\\test\\qinghuaci_out0.webm";
 #endif
 
     qDebug() << "transcoding, waiting...";
@@ -931,14 +937,14 @@ int FFmpegFileEncoder::transcoding(const char *intput_file, const char *output_f
 		ret = filter_encode_write_frame(NULL, i);
 		if (ret < 0) {
 			av_log(NULL, AV_LOG_ERROR, "Flushing filter failed\n");
-			goto end;
+            //goto end;
 		}
 
 		/* flush encoder */
 		ret = flush_encoder(i);
 		if (ret < 0) {
 			av_log(NULL, AV_LOG_ERROR, "Flushing encoder failed\n");
-			goto end;
+            //goto end;
 		}
 	}
 

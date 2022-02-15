@@ -79,12 +79,15 @@ SOURCES += \
     driver/sdl/SdlEventDispatcher.cpp \
     decoder/StreamMediaDecoder.cpp \
     common/RepeatableThread.cpp \
-    decoder/FFAvioContextHandle.cpp \
     encoder/FFmpegFileMerger.cpp \
     encoder/FFmpegAudioRecorder.cpp \
     decoder/M3u8Parsing.cpp \
     encoder/FFmpegAudioRecorder.cpp \
-    encoder/FFmpegAudioMerger.cpp
+    encoder/FFmpegAudioMerger.cpp \
+    decoder/FFAvioContext.cpp \
+    driver/MediaDecoder.cpp \
+    common/RepeatableThread.cpp \
+    common/ring_buffer.c
 
 HEADERS += \
         mainwindow.h \
@@ -115,13 +118,18 @@ HEADERS += \
     driver/sdl/SdlEventDispatcher.h \
     decoder/StreamMediaDecoder.h \
     common/RepeatableThread.h \
-    decoder/FFAvioContextHandle.h \
     encoder/FFmpegFileMerger.h \
     encoder/FFmpegAudioRecorder.h \
     decoder/M3u8Parsing.h \
     encoder/FFmpegAudioRecorder.h \
     encoder/FFmpegAudioMerger.h \
-    encoder/FFMergerCallback.h
+    encoder/FFMergerCallback.h \
+    decoder/FFAvioContext.h \
+    driver/MediaDecoder.h \
+    common/ByteLoopBuffer.h \
+    common/Common.h \
+    common/RepeatableThread.h \
+    common/ring_buffer.h
 
 FORMS += \
         mainwindow.ui

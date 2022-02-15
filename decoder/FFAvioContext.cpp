@@ -1,4 +1,4 @@
-#include "FFAvioContextHandle.h"
+#include "FFAvioContext.h"
 
 int read_packet(void *opaque, uint8_t *buf, int buf_size)
 {
@@ -15,7 +15,7 @@ int64_t seek(void *opaque, int64_t offset, int whence)
     return 0;
 }
 
-FFAvioContextHandle::FFAvioContextHandle(int bufferSize)
+FFAvioContext::FFAvioContext(int bufferSize)
 {
     pInputFmt = nullptr;
     pIoBuffer = (unsigned char*)av_malloc(bufferSize);
@@ -27,7 +27,7 @@ FFAvioContextHandle::FFAvioContextHandle(int bufferSize)
                                       read_packet, write_packet, seek);
 }
 
-FFAvioContextHandle::~FFAvioContextHandle()
+FFAvioContext::~FFAvioContext()
 {
     if(pIoBuffer)
         av_free(pIoBuffer);
@@ -36,7 +36,7 @@ FFAvioContextHandle::~FFAvioContextHandle()
         avio_context_free(&pAvioContext);
 }
 
-int FFAvioContextHandle::probe(const char *url)
+int FFAvioContext::probe(const char *url)
 {
     //step1:申请一个AVIOContext
 //    pb = avio_alloc_context(buf, BUF_SIZE, 0, NULL, read_data, NULL, NULL);

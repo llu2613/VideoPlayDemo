@@ -13,7 +13,7 @@ WaveformProcessor::WaveformProcessor(QObject *parent) : QObject(parent)
 {
     mThread = new QThread();
     moveToThread(mThread);
-    connect(mThread, &QThread::finished, mThread, &QObject::deleteLater);
+    //connect(mThread, &QThread::finished, mThread, &QObject::deleteLater);
     connect(this, &WaveformProcessor::sigRun, this,&WaveformProcessor::run);
 
     mThread->start();
@@ -21,7 +21,17 @@ WaveformProcessor::WaveformProcessor(QObject *parent) : QObject(parent)
 
 WaveformProcessor::~WaveformProcessor()
 {
+	delete mThread;
+	for (int k: mData16Map.keys()) {
+		delete mData16Map[k];
+	}
+	mData16Map.clear();
 
+	for (int k : mShowData.keys()) {
+		delete mShowData[k];
+	}
+	mShowData.clear();
+	
 }
 
 void WaveformProcessor::addSample(int sourceId, std::shared_ptr<SampleBuffer> buffer)
@@ -46,10 +56,10 @@ QList<int> WaveformProcessor::getShowData(int sourceId, int maxlen)
     LockedMapLocker lk(mShowData.mutex());
 
     if(mShowData.contains(sourceId)) {
-        std::list<int> &dataList = mShowData[sourceId];
-        maxlen = maxlen? maxlen: dataList.size();
-        std::list<int>::iterator itr = dataList.begin();
-        for(int i=0; i<maxlen && itr!=dataList.end(); i++) {
+        std::list<int> *dataList = mShowData[sourceId];
+        maxlen = maxlen? maxlen: dataList->size();
+        std::list<int>::iterator itr = dataList->begin();
+        for(int i=0; i<maxlen && itr!=dataList->end(); i++) {
             list.append(*itr);
         }
     }
@@ -110,23 +120,23 @@ void WaveformProcessor::addData16Bits(int sourceId, SampleBuffer *buffer)
 
     if(!mData16Map.contains(sourceId)) {
         //立体声*16位样本(2B)*AUDIO_FRAME_POINT_SIZE
-        mData16Map.insert(sourceId, LoopBuffer());
-        mData16Map[sourceId].alloc(minSize*100);
-        mData16Map[sourceId].reset();
+        ByteLoopBuffer *bf = new ByteLoopBuffer(minSize * 100);
+        bf->reset();
+		mData16Map.insert(sourceId, bf);
     }
-    LoopBuffer &mData16Buf = mData16Map[sourceId];
+    ByteLoopBuffer *mData16Buf = mData16Map[sourceId];
 
-    int cpLen = mData16Buf.push((unsigned char *)(buffer->data()+buffer->pos()),
+    int cpLen = mData16Buf->push((unsigned char *)(buffer->data()+buffer->pos()),
                     buffer->len()-buffer->pos());
     buffer->setPos(buffer->pos()+cpLen);
 
     unsigned char *buf = new unsigned char[minSize];
     for(int n=0; n<1000; n++) {
-        if(mData16Buf.len()<minSize) {
+        if(mData16Buf->len()<minSize) {
             break;
         }
         long total = 0;
-        int cp = mData16Buf.pop(buf, minSize);
+        int cp = mData16Buf->pop(buf, minSize);
         for(int i=0; i<cp-step; i+=step) {
             total = total + abs(*((short *)(buf+i)));
         }
@@ -135,7 +145,7 @@ void WaveformProcessor::addData16Bits(int sourceId, SampleBuffer *buffer)
     }
     delete buf;
 
-    cpLen = mData16Buf.push((unsigned char *)(buffer->data()+buffer->pos()),
+    cpLen = mData16Buf->push((unsigned char *)(buffer->data()+buffer->pos()),
                     buffer->len()-buffer->pos());
     buffer->setPos(buffer->pos()+cpLen);
 }
@@ -150,12 +160,13 @@ void WaveformProcessor::addWave(int sourceId, int wave)
     LockedMapLocker lk(mShowData.mutex());
 
     if(mShowData.contains(sourceId)) {
-        mShowData[sourceId].push_back(wave);
-        for(;mShowData[sourceId].size()>LIMIT_SHOW_SIZE;)
-            mShowData[sourceId].pop_front();
+		std::list<int> *list = mShowData[sourceId];
+		list->push_back(wave);
+        for(;list->size()>LIMIT_SHOW_SIZE;)
+            list->pop_front();
     } else {
-        std::list<int> list;
-        list.push_back(wave);
+        std::list<int> *list = new std::list<int>();
+        list->push_back(wave);
         mShowData.insert(sourceId, list);
     }
 

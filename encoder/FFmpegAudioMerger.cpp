@@ -22,6 +22,10 @@ FFmpegAudioMerger::FFmpegAudioMerger()
     duration = 0;
     samples = 0;
 
+    out_ch_layout = FF_INVALID;
+    out_sample_fmt = AV_SAMPLE_FMT_NONE;
+    out_sample_rate = FF_INVALID;
+
     av_log_set_level(AV_LOG_WARNING);
 //    av_log_set_callback(ff_log_callback);
 }
@@ -40,7 +44,18 @@ void FFmpegAudioMerger::setCallback(FFMergerCallback *callback)
 
 void FFmpegAudioMerger::start(std::string out_file)
 {
+    start(out_file, FF_INVALID, AV_SAMPLE_FMT_NONE, FF_INVALID);
+}
+
+void FFmpegAudioMerger::start(std::string out_file,
+           int64_t  out_ch_layout,
+           enum AVSampleFormat out_sample_fmt,
+           int out_sample_rate)
+{
     this->out_file = out_file;
+    this->out_ch_layout = out_ch_layout;
+    this->out_sample_fmt = out_sample_fmt;
+    this->out_sample_rate = out_sample_rate;
 }
 
 int FFmpegAudioMerger::merge(std::string in_file)
@@ -145,8 +160,12 @@ int FFmpegAudioMerger::openOutput()
     const char *output_filename = out_file.c_str();
     const AVCodecContext *in_codec_ctx = audioCodecContext();
 
+//    ret = mRecoder.open(output_filename, in_codec_ctx->channel_layout,
+//                  in_codec_ctx->sample_fmt, in_codec_ctx->sample_rate);
+
     ret = mRecoder.open(output_filename, in_codec_ctx->channel_layout,
-                  in_codec_ctx->sample_fmt, in_codec_ctx->sample_rate);
+                        in_codec_ctx->sample_fmt, in_codec_ctx->sample_rate,
+                        out_ch_layout, out_sample_fmt, out_sample_rate);
 
     has_opened = true;
 

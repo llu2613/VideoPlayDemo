@@ -1,11 +1,12 @@
 ﻿#include "mainwindow.h"
 #include <QApplication>
-#include "driver/sdl/SdlAudioPlayer.h"
+#include "driver/sdl/SmtAudioPlayer.h"
 #include <QDebug>
 #include "encoder/FFmpegFileEncoder.h"
 #include "encoder/FFmpegFileMerger.h"
 #include "encoder/FFmpegAudioMerger.h"
 #include "decoder/m3u8parsing.h"
+//#include "vld.h"
 
 class FFAudioMerger : public FFmpegAudioMerger, private FFMergerCallback
 {
@@ -52,14 +53,26 @@ void useOpenGLMode(int openGLMode)
     }
 }
 
+void sdlTest(){
+    SmtAudioPlayer *player = SmtAudioPlayer::inst();
+    player->initialize();
+    FFmpegMediaDecoder decoder;
+    for(;;) {
+        decoder.open("rtsp://192.168.1.151:554/audio_stereo", NULL, false);
+
+        decoder.close();
+    }
+}
+
 int main(int argc, char *argv[])
 {
 //    M3u8Parsing parsing;
 //    parsing.test();
 
     FFAudioMerger merger;
-    merger.start("D:/test/out_recoder_audio02.mp3");
-    merger.merge("http://192.168.1.57:9080/m3u8file/8CBFA051-9BEE-4728-8CEF-F8083C4F9C4D1106.m3u8");
+    merger.start("D:/test/out_recoder_audio02.wav",
+                 AV_CH_LAYOUT_MONO, AV_SAMPLE_FMT_NONE, 16000);
+    merger.merge("D:/test/qinghuaci.mp4");
     merger.finish();
 
 //    useOpenGLMode(2);

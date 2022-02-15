@@ -8,7 +8,8 @@ RepeatableThread::RepeatableThread(RepRunnable *runnable)
 
     mThread = new QThread();
     this->moveToThread(mThread);
-    connect(this, &RepeatableThread::thRun, this, &RepeatableThread::run, Qt::QueuedConnection);
+    connect(this, &RepeatableThread::thRun, this, &RepeatableThread::run,
+            Qt::QueuedConnection);
 
     mThread->start();
 }
