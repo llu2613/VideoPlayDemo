@@ -26,12 +26,42 @@ int FFmpegAudioRecorder::flush_encoder(AVFormatContext *ofmt_ctx,int stream_inde
     if (!(enc_ctx->codec->capabilities & AV_CODEC_CAP_DELAY))
         return 0;
 
+    ret = flush_audio_fifo(stream_index);
+
     for(int i=0; i<100; i++) {
         //av_log(NULL, AV_LOG_INFO, "Flushing stream #%u encoder\n", stream_index);
         ret = encode_write_frame(NULL, stream_index);
         if (ret < 0)
             break;
     }
+    return ret;
+}
+
+int FFmpegAudioRecorder::flush_audio_fifo(int stream_index)
+{
+    int ret = 0;
+    const int output_frame_size = enc_ctx->frame_size;
+
+    while (av_audio_fifo_size(audio_fifo)>0) {
+        const int frame_size = FFMIN(av_audio_fifo_size(audio_fifo), output_frame_size);
+
+        AVFrame *output_frame;
+        if (init_output_frame(&output_frame, enc_ctx, frame_size) < 0) {
+            av_log(NULL, AV_LOG_ERROR, "init_output_frame failed\n");
+            return AVERROR_EXIT;
+        }
+
+        if (av_audio_fifo_read(audio_fifo, (void **)output_frame->data, frame_size) < frame_size) {
+            av_log(NULL, AV_LOG_ERROR, "Could not read data from FIFO\n");
+            av_frame_free(&output_frame);
+            return AVERROR_EXIT;
+        }
+        output_frame->nb_samples = frame_size;
+
+        ret = encode_write_frame(output_frame, stream_index);
+        av_frame_free(&output_frame);
+    }
+
     return ret;
 }
 
@@ -183,7 +213,6 @@ int FFmpegAudioRecorder::open(const char *output,
     const int bit_depth = 32;
     AVSampleFormat sample_fmt = out_sample_fmt!=AV_SAMPLE_FMT_NONE?
                 out_sample_fmt:pCodec->sample_fmts[0];
-    //enc_ctx->codec_id = oformat->audio_codec;
     enc_ctx->codec_type = AVMEDIA_TYPE_AUDIO;
     enc_ctx->sample_fmt = sample_fmt;
     enc_ctx->channel_layout = out_ch_layout!=FF_INVALID?out_ch_layout:src_ch_layout;
@@ -340,7 +369,7 @@ int FFmpegAudioRecorder::encode_write_frame_fifo(AVFrame *filt_frame, unsigned i
     }
 
     while (av_audio_fifo_size(audio_fifo) >= enc_ctx->frame_size) {
-        const int frame_size = FFMIN(av_audio_fifo_size(audio_fifo), enc_ctx->frame_size);
+        const int frame_size = FFMIN(av_audio_fifo_size(audio_fifo), output_frame_size);
 
         AVFrame *output_frame;
         if (init_output_frame(&output_frame, enc_ctx, frame_size) < 0) {

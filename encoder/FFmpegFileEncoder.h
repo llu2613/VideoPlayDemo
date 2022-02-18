@@ -33,6 +33,7 @@ class FFmpegFileEncoder
 		AVAudioFifo *audio_fifo;
 		int64_t audio_pts;
 		int64_t video_pts;
+        int64_t video_last_pts;
 	} StreamContext;
 	
 public:
@@ -81,6 +82,7 @@ private:
 	void print_packet(const AVFormatContext *fmt_ctx, const AVPacket *pkt);
     int encode_write_frame(AVFrame *filt_frame, unsigned int stream_index);
 	int filter_encode_write_frame(AVFrame *frame, unsigned int stream_index);
+    int flush_audio_fifo(unsigned int stream_index);
 	int flush_encoder(unsigned int stream_index);
 
 

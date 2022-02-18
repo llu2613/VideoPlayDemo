@@ -71,8 +71,8 @@ int main(int argc, char *argv[])
 
     FFAudioMerger merger;
     merger.start("D:/test/out_recoder_audio02.wav",
-                 AV_CH_LAYOUT_MONO, AV_SAMPLE_FMT_NONE, 16000);
-    merger.merge("D:/test/qinghuaci.mp4");
+                 AV_CH_LAYOUT_MONO, AV_SAMPLE_FMT_NONE, 48000);
+    merger.merge("D:/test/qinghuaci.mp4", 60, 63);
     merger.finish();
 
 //    useOpenGLMode(2);
@@ -82,8 +82,8 @@ int main(int argc, char *argv[])
     qRegisterMetaType<std::shared_ptr<MediaData>>("std::shared_ptr<MediaData>");
     qRegisterMetaType<std::shared_ptr<SampleBuffer>>("std::shared_ptr<SampleBuffer>");
 
-//    FFmpegFileEncoder encoder;
-//    encoder.test();
+    FFmpegFileEncoder encoder;
+    encoder.test();
 
 //    FFmpegFileMerger merger;
 //    merger.test2();

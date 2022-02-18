@@ -127,9 +127,9 @@ HEADERS += \
     decoder/FFAvioContext.h \
     driver/MediaDecoder.h \
     common/ByteLoopBuffer.h \
-    common/Common.h \
     common/RepeatableThread.h \
-    common/ring_buffer.h
+    common/ring_buffer.h \
+    common/ffmpeg_commons.h
 
 FORMS += \
         mainwindow.ui

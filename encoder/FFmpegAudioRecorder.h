@@ -1,16 +1,14 @@
 ﻿#ifndef FFMPEGAUDIORECORDER_H
 #define FFMPEGAUDIORECORDER_H
 
-#include <stdio.h>
-#include <stdlib.h>
+#include "common/ffmpeg_commons.h"
+
 extern "C" {
 #include "libavformat/avformat.h"
 #include "libavcodec/avcodec.h"
 #include "libswresample/swresample.h"
 #include "libavutil/audio_fifo.h"
 }
-
-#define FF_INVALID (-1)
 
 class FFmpegAudioRecorder
 {
@@ -45,8 +43,8 @@ private:
         const int nb_samples);
     int encode_write_frame_fifo(AVFrame *filt_frame, unsigned int stream_index);
     int encode_write_frame(AVFrame *filt_frame, unsigned int stream_index);
+    int flush_audio_fifo(int stream_index);
     int flush_encoder(AVFormatContext *ofmt_ctx,int stream_index);
-
 
     AVFormatContext *ofmt_ctx;
     AVStream *out_stream;
@@ -59,12 +57,6 @@ private:
     AVAudioFifo *audio_fifo;
     int audio_pts;
 
-    inline char* wrap_av_err2str(int errnum)
-    {
-        static char str[AV_ERROR_MAX_STRING_SIZE];
-        memset(str, 0, sizeof(str));
-        return av_make_error_string(str, AV_ERROR_MAX_STRING_SIZE, errnum);
-    }
 };
 
 #endif // FFMPEGAUDIORECORDER_H
