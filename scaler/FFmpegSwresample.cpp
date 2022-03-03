@@ -25,13 +25,9 @@ int FFmpegSwresample::init(enum AVSampleFormat in_fmt, int in_rate, uint64_t in_
 {
     int ret =0;
 
-    //输入的采样格式
     in_sample_fmt = in_fmt;
-    //输入的采样率
     in_sample_rate = in_rate;
-    //输入的声道布局
     in_channel_layout = in_ch_layout;
-
     out_sample_fmt = out_fmt;
     out_sample_rate = out_rate;
     out_channel_layout = out_ch_layout;

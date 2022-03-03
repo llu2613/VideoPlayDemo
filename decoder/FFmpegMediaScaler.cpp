@@ -179,13 +179,21 @@ int FFmpegMediaScaler::initAudioResample(AVCodecContext *pCodeCtx)
     return 0;
 }
 
-int FFmpegMediaScaler::initVideoScale(AVCodecContext *pCodeCtx)
+int FFmpegMediaScaler::initVideoScale(AVCodecContext *pCodecCtx)
+{
+    std::lock_guard<std::recursive_mutex> lk(videoMutex);
+
+    return initVideoScale(pCodecCtx->pix_fmt,pCodecCtx->width,pCodecCtx->height);
+}
+
+int FFmpegMediaScaler::initVideoScale(enum AVPixelFormat in_pixel_fmt, int in_width, int in_height)
 {
     std::lock_guard<std::recursive_mutex> lk(videoMutex);
 
     int ret = 0;
     FFmpegSwscale *p = new FFmpegSwscale();
-    ret = p->init(pCodeCtx, out_video_width, out_video_height, out_video_fmt);
+    ret = p->init(in_pixel_fmt, in_width, in_height,
+                  out_video_fmt, out_video_width, out_video_height);
     if(ret<0) {
         print_error("initVideoScale", ret);
         delete p;
@@ -308,6 +316,6 @@ void FFmpegMediaScaler::print_error(const char *name, int err)
         errbuf_ptr = strerror(AVUNERROR(err));
     av_log(NULL, AV_LOG_ERROR, "%s: %s\n", name, errbuf_ptr);
 
-    sprintf_s(message, sizeof(message), "(%s)%s", name, errbuf_ptr);
+    sprintf(message, "(%s)%s", name, errbuf_ptr);
     printError(err, message);
 }

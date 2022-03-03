@@ -66,12 +66,12 @@ int FFmpegAudioRecorder::flush_audio_fifo(int stream_index)
 }
 
 int FFmpegAudioRecorder::open(const char *output,
-                              int64_t  src_ch_layout,
+                              int64_t src_ch_layout,
                               enum AVSampleFormat src_sample_fmt,
                               int src_sample_rate)
 {
     if(ofmt_ctx) {
-        printf("ofmt_ctx has been inited, please close first!\n");
+        av_log(NULL,AV_LOG_ERROR,"ofmt_ctx has been inited, please close first!\n");
         return 0;
     }
 
@@ -104,7 +104,6 @@ int FFmpegAudioRecorder::open(const char *output,
         return -1;
     }
 
-    const int bit_depth = 32;
     AVSampleFormat sample_fmt = pCodec->sample_fmts[0]!=AV_SAMPLE_FMT_NONE?
                 pCodec->sample_fmts[0]:AV_SAMPLE_FMT_NONE;
     //enc_ctx->codec_id = oformat->audio_codec;
@@ -113,7 +112,9 @@ int FFmpegAudioRecorder::open(const char *output,
     enc_ctx->channel_layout = src_ch_layout;
     enc_ctx->channels = av_get_channel_layout_nb_channels(src_ch_layout);
     enc_ctx->sample_rate = src_sample_rate;
-    enc_ctx->bit_rate = enc_ctx->sample_rate*enc_ctx->channels*bit_depth;
+    /* 比特率=采样率 * 采样位数 * 通道数 * 压缩比例 */
+//    enc_ctx->bit_rate = (enc_ctx->sample_rate)*(enc_ctx->channels)*
+//            av_get_bytes_per_sample(enc_ctx->sample_fmt)*8;
 
     ret = avcodec_open2(enc_ctx,pCodec,NULL);
     if (ret < 0){
@@ -176,18 +177,65 @@ int FFmpegAudioRecorder::open(const char *output,
                               enum AVSampleFormat out_sample_fmt,
                               int out_sample_rate)
 {
+    int ret = 0;
+
     if(ofmt_ctx) {
-        printf("ofmt_ctx has been inited, please close first!\n");
+        av_log(NULL,AV_LOG_ERROR, "ofmt_ctx has been inited, please close first!\n");
         return 0;
     }
 
-    int ret = 0;
-    ofmt_ctx = avformat_alloc_context();
-    AVOutputFormat *oformat = av_guess_format(NULL,output,NULL);
+    AVOutputFormat *oformat = av_guess_format(NULL,output, NULL);
     if (oformat==NULL){
         av_log(NULL,AV_LOG_ERROR,"fail to find the output format\n");
         return -1;
     }
+
+    AVCodec *pCodec = avcodec_find_encoder(oformat->audio_codec);
+    if (pCodec == NULL){
+        av_log(NULL,AV_LOG_ERROR,"fail to find codec\n");
+        return -1;
+    }
+
+    AVSampleFormat enc_sample_fmt = AV_SAMPLE_FMT_NONE;
+    int enc_sample_rate = 0;
+    uint64_t enc_ch_layout = 0;
+    for(int i=0; pCodec->sample_fmts[i]!=AV_SAMPLE_FMT_NONE;i++) {
+        if(out_sample_fmt==AV_SAMPLE_FMT_NONE
+                ||out_sample_fmt==pCodec->sample_fmts[i]) {
+            enc_sample_fmt = pCodec->sample_fmts[i];
+            break;
+        }
+    }
+    for(int i=0; pCodec->supported_samplerates[i]!=0;i++) {
+        if(out_sample_rate==0
+                ||out_sample_rate==pCodec->supported_samplerates[i]) {
+            enc_sample_rate = pCodec->supported_samplerates[i];
+            break;
+        }
+    }
+    for(int i=0; pCodec->channel_layouts[i]!=0;i++) {
+        if(out_ch_layout==0
+                ||out_ch_layout==pCodec->channel_layouts[i]) {
+            enc_ch_layout = pCodec->channel_layouts[i];
+            break;
+        }
+    }
+
+    if(enc_sample_fmt==AV_SAMPLE_FMT_NONE) {
+        av_log(NULL, AV_LOG_ERROR, "Unsupported sample format\n");
+        return -1;
+    }
+    if(enc_sample_rate==0) {
+        av_log(NULL, AV_LOG_ERROR, "Unsupported sample rate\n");
+        return -1;
+    }
+    if(enc_ch_layout==0) {
+        av_log(NULL, AV_LOG_ERROR, "Unsupported channel layout\n");
+        return -1;
+    }
+
+    ofmt_ctx = avformat_alloc_context();
+
     if (avformat_alloc_output_context2(&ofmt_ctx,oformat,oformat->name,output) <0){
         av_log(NULL,AV_LOG_ERROR,"fail to alloc output context\n");
         return -1;
@@ -198,27 +246,23 @@ int FFmpegAudioRecorder::open(const char *output,
         return -1;
     }
 
-    AVCodec *pCodec = avcodec_find_encoder(oformat->audio_codec);
-    if (pCodec == NULL){
-        av_log(NULL,AV_LOG_ERROR,"fail to find codec\n");
-        return -1;
-    }
-
     enc_ctx = avcodec_alloc_context3(pCodec);
     if (!enc_ctx) {
         av_log(NULL, AV_LOG_ERROR, "failed to allocate the encoder context\n");
         return -1;
     }
 
-    const int bit_depth = 32;
-    AVSampleFormat sample_fmt = out_sample_fmt!=AV_SAMPLE_FMT_NONE?
-                out_sample_fmt:pCodec->sample_fmts[0];
     enc_ctx->codec_type = AVMEDIA_TYPE_AUDIO;
-    enc_ctx->sample_fmt = sample_fmt;
-    enc_ctx->channel_layout = out_ch_layout!=FF_INVALID?out_ch_layout:src_ch_layout;
+    enc_ctx->sample_fmt = enc_sample_fmt;
+    enc_ctx->channel_layout = enc_ch_layout;
     enc_ctx->channels = av_get_channel_layout_nb_channels(enc_ctx->channel_layout);
-    enc_ctx->sample_rate = out_sample_rate!=FF_INVALID?out_sample_rate:src_sample_rate;
-    enc_ctx->bit_rate = enc_ctx->sample_rate*enc_ctx->channels*bit_depth;
+    enc_ctx->sample_rate = enc_sample_rate;
+    /* 比特率=采样率 * 采样位数 * 通道数 * 压缩比例 */
+//    enc_ctx->bit_rate = (enc_ctx->sample_rate)*(enc_ctx->channels)*
+//            av_get_bytes_per_sample(enc_ctx->sample_fmt)*8;
+
+    av_log(NULL, AV_LOG_INFO, "enc_ctx: sp %d ch %d fmt %d(bits:%d) br %d\n", enc_ctx->sample_rate, enc_ctx->channels,
+           enc_ctx->sample_fmt, av_get_bytes_per_sample(enc_ctx->sample_fmt), enc_ctx->bit_rate);
 
     ret = avcodec_open2(enc_ctx,pCodec,NULL);
     if (ret < 0){
@@ -276,19 +320,19 @@ int FFmpegAudioRecorder::open(const char *output,
 int FFmpegAudioRecorder::addData(AVFrame *frame, AVPacket *packet)
 {
     if(!swr_ctx) {
-        printf("swr_ctx is null!\n");
+        av_log(NULL,AV_LOG_ERROR,"swr_ctx is null!\n");
         return -1;
     }
     if(!audio_data) {
-        printf("audio_data is null!\n");
+        av_log(NULL,AV_LOG_ERROR,"audio_data is null!\n");
         return -1;
     }
     if(!enc_ctx) {
-        printf("enc_ctx is null!\n");
+        av_log(NULL,AV_LOG_ERROR,"enc_ctx is null!\n");
         return -1;
     }
     if(!audio_fifo) {
-        printf("audio_fifo is null!\n");
+        av_log(NULL,AV_LOG_ERROR,"audio_fifo is null!\n");
         return -1;
     }
 
@@ -462,6 +506,27 @@ void FFmpegAudioRecorder::close()
         avformat_free_context(ofmt_ctx);
         ofmt_ctx = nullptr;
     }
+}
+
+void FFmpegAudioRecorder::av_log(void *avcl, int level, const char *fmt, ...)
+{
+    char sprint_buf[1024];
+
+    va_list args;
+    int n;
+    va_start(args, fmt);
+    n = vsnprintf(sprint_buf, sizeof(sprint_buf), fmt, args);
+    va_end(args);
+
+    if(level<AV_LOG_WARNING) {
+        print_errmsg(-1, sprint_buf);
+    }
+    printf("[%s]%s", "FFmpegAudioRecorder", sprint_buf);
+}
+
+void FFmpegAudioRecorder::print_errmsg(int code, const char *msg)
+{
+
 }
 
 bool FFmpegAudioRecorder::isReady()

@@ -41,13 +41,13 @@ public:
     bool isVideoReady();
 
     int initAudioResample(AVCodecContext *pCodeCtx);
-
     int initAudioResample(enum AVSampleFormat in_fmt,
                           int in_rate, int in_channels,
                           enum AVSampleFormat out_fmt,
                           int out_rate, int out_channels);
 
     int initVideoScale(AVCodecContext *pCodeCtx);
+    int initVideoScale(enum AVPixelFormat in_pixel_fmt, int in_width, int in_height);
 
     void freeAudioResample();
 

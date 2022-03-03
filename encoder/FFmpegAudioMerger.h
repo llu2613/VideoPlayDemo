@@ -40,11 +40,12 @@ private:
     int write_samples_to_fifo(AVAudioFifo *fifo,
                               uint8_t **converted_input_samples,
                               const int nb_samples);
-    int fifo_write_encoder(int frame_size);
+    int fifo_write_encoder(int frame_size, int *ret_wrote_size);
     int flush_sample_fifo();
 
+    void av_log(void *avcl, int level, const char *fmt, ...);
     void progress(long current, long total);
-    void print_error(int code, std::string msg);
+    void print_errmsg(int code, const char *msg);
 
     std::mutex m_mutex;
     std::string out_file;

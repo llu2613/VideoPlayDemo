@@ -53,6 +53,8 @@ DEFINES += QT_DEPRECATED_WARNINGS
 
 
 SOURCES += \
+    common/yuv_pcm_file.cpp \
+    hw_decode.c \
         main.cpp \
         mainwindow.cpp \
     encoder/FFmpegFileEncoder.cpp \
@@ -90,6 +92,7 @@ SOURCES += \
     common/ring_buffer.c
 
 HEADERS += \
+    common/yuv_pcm_file.h \
         mainwindow.h \
     encoder/FFmpegFileEncoder.h \
     decoder/FFmpegMediaDecoder.h \

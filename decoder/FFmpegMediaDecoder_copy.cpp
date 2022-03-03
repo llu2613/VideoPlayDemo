@@ -5,13 +5,6 @@
 
 #define LOG(...) qDebug(__VA_ARGS__)
 
-/*
- * FFmpeg 示例硬件解码hw_decode
- * https://www.jianshu.com/p/3ea9ef713211
- * Access the power of hardware accelerated video codecs in your Windows applications via FFmpeg / libavcodec
- * https://habr.com/en/company/intel/blog/575632/
-*/
-
 //20s超时退出
 #define INTERRUPT_TIMEOUT (10 * 1000 * 1000)
 
@@ -31,7 +24,6 @@ FFmpegMediaDecoder::FFmpegMediaDecoder()
     pFormatCtx = nullptr;
     pAudioCodecCtx = nullptr;
     pVideoCodecCtx = nullptr;
-    hw_device_ctx = nullptr;
 
     readFailedCnt = 0;
     audioFrameCnt = 0;
@@ -130,19 +122,22 @@ void FFmpegMediaDecoder::setOutVideo(enum AVPixelFormat fmt, int width, int heig
 
 int FFmpegMediaDecoder::audioRawFrame(AVCodecContext *pCodecCtx, AVFrame *frame, AVPacket *packet)
 {
-    int ret;
-
+    int ret, got_frame=0;
+    //解码AVPacket->AVFrame
+    //ret = avcodec_decode_audio4(pCodecCtx, frame, &got_frame, packet);
 	ret = avcodec_send_packet(pCodecCtx, packet);
     if (ret < 0) {
         print_error("avcodec_decode_audio4", ret);
         return ret;
     }
 
-    while (1) {
-        int errcode = avcodec_receive_frame(pCodecCtx, frame);
-        if (errcode != 0) {
+    //非0，正在解码
+    for (int i=0;i<100;i++) {
+		ret = avcodec_receive_frame(pCodecCtx, frame);
+		if (ret != 0) {
 			break;
 		}
+		got_frame++;
 		audioFrameCnt++;
 		audioDecodedData(frame, packet);
 		if (frame->decode_error_flags) {
@@ -152,74 +147,27 @@ int FFmpegMediaDecoder::audioRawFrame(AVCodecContext *pCodecCtx, AVFrame *frame,
 		}
 	}
 
-    return ret;
+    return got_frame;
 }
 
-int FFmpegMediaDecoder::decode_video_frame_hw(AVCodecContext *pCodecCtx, AVFrame *frame, AVPacket *packet)
+int FFmpegMediaDecoder::videoRawFrame(AVCodecContext *pCodecCtx, AVFrame *frame, AVPacket *packet)
 {
-    int ret = 0;
-    AVFrame *sw_frame = NULL;
-
-    if (!(sw_frame = av_frame_alloc())) {
-        print_error("Can not alloc frame", -1);
-        return ret;
-    }
-
-    ret = avcodec_send_packet(pCodecCtx, packet);
-    if (ret < 0) {
-        print_error("avcodec_send_packet", ret);
-        return ret;
-    }
-
-    while (1) {
-        int errcode = avcodec_receive_frame(pCodecCtx, sw_frame);
-        if (errcode == AVERROR(EAGAIN) || errcode == AVERROR_EOF) {
-            break;
-        } else if (errcode < 0) {
-            print_error("Error while decoding", ret);
-            break;
-        }
-
-        if(!sws_isSupportedInput((AVPixelFormat)sw_frame->format)) {
-            /* retrieve data from GPU to CPU */
-            if ((ret = av_hwframe_transfer_data(frame, sw_frame, 0)) < 0) {
-                print_error("Error transferring the data to system memory", ret);
-                break;
-            }
-        } else {
-            av_frame_copy(frame, sw_frame);
-            av_frame_ref(frame, sw_frame);
-        }
-        videoFrameCnt++;
-        videoDecodedData(frame, packet, pCodecCtx->height);
-        if(frame->decode_error_flags) {
-            char tmp[256];
-            sprintf(tmp, "video decode_error_flags:%d", frame->decode_error_flags);
-            printError(0, tmp);
-        }
-        av_frame_unref(frame);
-    }
-
-    if(sw_frame)
-        av_frame_free(&sw_frame);
-
-    return ret;
-}
-int FFmpegMediaDecoder::decode_video_frame(AVCodecContext *pCodecCtx, AVFrame *frame, AVPacket *packet)
-{
-    int ret = 0;
-
-    ret = avcodec_send_packet(pCodecCtx, packet);
+    int ret, got_picture=0;
+    //7.解码一帧视频压缩数据，得到视频像素数据
+    //ret = avcodec_decode_video2(pCodecCtx, frame, &got_picture, packet);
+	ret = avcodec_send_packet(pCodecCtx, packet);
     if (ret < 0) {
         print_error("avcodec_decode_video2", ret);
         return ret;
     }
 
-    while (1) {
-        int errcode = avcodec_receive_frame(pCodecCtx, frame);
-        if (errcode != 0) {
-            break;
-        }
+    //为0说明解码完成，非0正在解码
+    for (int i=0;i<100;i++) {
+		ret = avcodec_receive_frame(pCodecCtx, frame);
+		if (ret != 0) {
+			break;
+		}
+		got_picture++;
         videoFrameCnt++;
         videoDecodedData(frame, packet, pCodecCtx->height);
         if(frame->decode_error_flags) {
@@ -229,16 +177,7 @@ int FFmpegMediaDecoder::decode_video_frame(AVCodecContext *pCodecCtx, AVFrame *f
         }
     }
 
-    return ret;
-}
-
-int FFmpegMediaDecoder::videoRawFrame(AVCodecContext *pCodecCtx, AVFrame *frame, AVPacket *packet)
-{
-    if(mIsHwaccels) {
-        return decode_video_frame_hw(pCodecCtx, frame, packet);
-    } else {
-        return decode_video_frame(pCodecCtx, frame, packet);
-    }
+    return got_picture;
 }
 
 void FFmpegMediaDecoder::audioDecodedData(AVFrame *frame, AVPacket *packet)
@@ -263,19 +202,9 @@ void FFmpegMediaDecoder::videoDecodedData(AVFrame *frame, AVPacket *packet, int 
     //3 7输入、输出画面一行的数据的大小 AVFrame 转换是一行一行转换的
     //4 输入数据第一列要转码的位置 从0开始
     //5 输入画面的高度
-    int out_height = 0;
-	AVFrame* out_frame = NULL;
+    int out_height;
+    AVFrame* out_frame = scaler.videoScale(pixelHeight, frame, &out_height);
 
-    if(scaler.isVideoReady()&&scaler.srcVideoFmt()==frame->format
-            &&scaler.srcVideoWidth()==frame->width&&scaler.srcVideoHeight()==frame->height) {
-    } else {
-        scaler.freeVideoScale();
-        int ret = scaler.initVideoScale((enum AVPixelFormat)frame->format, frame->width, frame->height);
-    }
-	
-	out_frame = scaler.videoScale(pixelHeight, frame, &out_height);
-
-    
 //    AVFrame *pFrameYUV = out_frame;
 //        if(fp_yuv) {
 //            //输出到YUV文件
@@ -288,8 +217,7 @@ void FFmpegMediaDecoder::videoDecodedData(AVFrame *frame, AVPacket *packet, int 
 //            fwrite(pFrameYUV->data[1], 1, y_size / 4, fp_yuv);
 //            fwrite(pFrameYUV->data[2], 1, y_size / 4, fp_yuv);
 //        }
-	if(out_frame)
-		videoScaledData(out_frame, packet, out_height);
+    videoScaledData(out_frame, packet, out_height);
 }
 
 void FFmpegMediaDecoder::audioResampledData(AVPacket *packet, uint8_t *sampleBuffer,
@@ -383,119 +311,6 @@ void FFmpegMediaDecoder::videoDataReady(std::shared_ptr<MediaData> data)
         mCallback->onVideoDataReady(data);
 }
 
-int FFmpegMediaDecoder::hw_decoder_init(AVCodecContext *ctx, const enum AVHWDeviceType type)
-{
-    int err = 0;
-
-    if ((err = av_hwdevice_ctx_create(&hw_device_ctx, type,
-                                      NULL, NULL, 0)) < 0) {
-        fprintf(stderr, "Failed to create specified HW device.\n");
-        return err;
-    }
-    ctx->hw_device_ctx = av_buffer_ref(hw_device_ctx);
-
-    hw_formats.clear();
-
-
-    AVHWFramesConstraints* hw_frames_const = av_hwdevice_get_hwframe_constraints(hw_device_ctx, NULL);
-    if (hw_frames_const) {
-        for (AVPixelFormat* p = hw_frames_const->valid_hw_formats;
-            *p != AV_PIX_FMT_NONE; p++) {
-            hw_formats.push_back(*p);
-            qDebug()<<"hw_formats"<<QString::fromLocal8Bit(av_get_pix_fmt_name(*p));
-        }
-        for (AVPixelFormat* p = hw_frames_const->valid_sw_formats;
-            *p != AV_PIX_FMT_NONE; p++) {
-            qDebug()<<"sw_formats"<<QString::fromLocal8Bit(av_get_pix_fmt_name(*p));
-        }
-        av_hwframe_constraints_free(&hw_frames_const);
-    } else {
-        qDebug()<<"hw_frames_const is null"<<type;
-    }
-
-    return err;
-}
-
-const AVCodecHWConfig *FFmpegMediaDecoder::find_hwaccel(const AVCodec *codec, enum AVPixelFormat pix_fmt)
-{
-    std::list<enum AVHWDeviceType> typeList;
-    std::list<std::string> typeNameList;
-    enum AVHWDeviceType type = AV_HWDEVICE_TYPE_NONE;
-    while((type = av_hwdevice_iterate_types(type)) != AV_HWDEVICE_TYPE_NONE) {
-        typeList.push_back(type);
-        const char *type_name = av_hwdevice_get_type_name(type);
-        if(type_name)
-            typeNameList.push_back(type_name);
-    }
-
-    for (int i=0;;i++) {
-        const AVCodecHWConfig *config = avcodec_get_hw_config(codec, i);
-        if (!config) {
-            printError(-1, "Decoder does not support hw device");
-            return NULL;
-        }
-
-        if (config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX) {
-            for(std::list<AVHWDeviceType>::iterator iter=typeList.begin();
-                iter!=typeList.end();iter++) {
-                if(*iter==config->device_type)
-                    return config;
-            }
-        }
-    }
-
-    return NULL;
-}
-
-int FFmpegMediaDecoder::openHwCodec(AVFormatContext *pFormatCtx, int stream_idx,
-									AVCodecContext **pCodeCtx)
-{
-	int ret = 0;
-
-    AVCodecParameters *pCodecPar = pFormatCtx->streams[stream_idx]->codecpar;
-    if (!(*pCodeCtx))
-        avcodec_free_context(pCodeCtx);
-
-    AVCodec *pCodec = avcodec_find_decoder(pCodecPar->codec_id);
-    if (pCodec == NULL) {
-        printError(-1, "avcodec_find_decoder is null");
-        return -1;
-    }
-
-    const AVCodecHWConfig* config = find_hwaccel(pCodec, (enum AVPixelFormat)pCodecPar->format);
-    if(config == NULL) {
-        printError(-1, "avcodec_find_decoder is null");
-        return -1;
-    }
-
-    qDebug()<<"find_hwaccel: fmt"<<config->pix_fmt
-           <<QString::fromLocal8Bit(av_hwdevice_get_type_name(config->device_type));
-
-    *pCodeCtx = avcodec_alloc_context3(pCodec);
-    if (*pCodeCtx == NULL) {
-        printError(-1, "avcodec_alloc_context3 failed");
-        return -1;
-    }
-
-    if ((ret=avcodec_parameters_to_context(*pCodeCtx, pCodecPar)) < 0) {
-        print_error("avcodec_parameters_to_context", ret);
-        return ret;
-    }
-
-    if ((ret=hw_decoder_init(*pCodeCtx, config->device_type)) < 0) {
-        print_error("Failed to init specified HW device", ret);
-        return -1;
-    }
-
-    ret = avcodec_open2(*pCodeCtx, pCodec, NULL);
-    if (ret < 0) {
-        print_error("failed to open codec", ret);
-        return ret;
-    }
-
-	return ret;
-}
-
 int FFmpegMediaDecoder::openCodec(AVFormatContext *pFormatCtx, int stream_idx,
                                   AVCodecContext **pCodeCtx)
 {
@@ -531,6 +346,64 @@ int FFmpegMediaDecoder::openCodec(AVFormatContext *pFormatCtx, int stream_idx,
     return ret;
 }
 
+void FFmpegMediaDecoder::aa()
+{
+    avctx->hwaccel = ff_find_hwaccel(avctx->codec->id, avctx->pix_fmt);
+    avctx->pix_fmt = mpeg_get_pixelformat(avctx);
+    avctx->hwaccel = ff_find_hwaccel(avctx->codec->id, avctx->pix_fmt);
+}
+
+AVHWAccel *FFmpegMediaDecoder::ff_find_hwaccel(enum AVCodecID codec_id, enum AVPixelFormat pix_fmt)
+{
+	AVHWAccel *hwaccel = NULL;
+
+	while ((hwaccel = av_hwaccel_next(hwaccel))) {
+		if (hwaccel->id == codec_id
+			&& hwaccel->pix_fmt == pix_fmt)
+			return hwaccel;
+	}
+	return NULL;
+}
+
+int FFmpegMediaDecoder::openHwCodec(AVFormatContext *pFormatCtx, int stream_idx,
+									AVCodecContext **pCodeCtx)
+{
+	int ret = 0;
+	
+	AVCodecParameters *pCodecPar = pFormatCtx->streams[stream_idx]->codecpar;
+	if (!(*pCodeCtx))
+		avcodec_free_context(pCodeCtx);
+
+//	findHwaccel(pCodecPar->codec_id, (enum AVPixelFormat)pCodecPar->format);
+
+    AVHWAccel *hwaccel = findHwaccel(pCodecPar->codec_id, (enum AVPixelFormat)pCodecPar->format);
+    //    avctx->hwaccel = ff_find_hwaccel(avctx->codec->id, avctx->pix_fmt);
+
+	//AVCodec *pCodec = avcodec_find_decoder_by_name("h264_qsv");//Intel核心显卡
+	//if (!pCodec) pCodec = avcodec_find_decoder_by_name("h264_nvenc");//英伟达显卡
+	AVCodec *pCodec = avcodec_find_decoder(pCodecPar->codec_id);
+	if (pCodec == NULL) {
+		printError(-1, "无法解码(pCodec)");
+		return -1;
+	}
+
+	*pCodeCtx = avcodec_alloc_context3(pCodec);
+	if (*pCodeCtx == NULL) {
+		printError(-1, "无法解码(pCodeCtx)");
+		return -1;
+	}
+
+	avcodec_parameters_to_context(*pCodeCtx, pCodecPar);
+	//5.打开解码器
+	ret = avcodec_open2(*pCodeCtx, pCodec, NULL);
+	if (ret < 0) {
+		printError(ret, "编码器无法打开");
+		return ret;
+	}
+
+	return ret;
+}
+
 int FFmpegMediaDecoder::initAudioCodec(AVFormatContext *pFormatCtx, int stream_idx)
 {
     int ret = 0;
@@ -552,18 +425,7 @@ int FFmpegMediaDecoder::initVideoCodec(AVFormatContext *pFormatCtx, int stream_i
 {
     int ret = 0;
     //打开解码器
-    if(mIsHwaccels) {
-        ret = openHwCodec(pFormatCtx, stream_idx, &pVideoCodecCtx);
-        if(ret<0) {
-            mIsHwaccels = false;
-        }
-    }
-    if(!mIsHwaccels) {
-        ret = openCodec(pFormatCtx, stream_idx, &pVideoCodecCtx);
-    }
-
-    qDebug()<<"mIsHwaccels:"<<(mIsHwaccels?"True":"False");
-
+    ret = openHwCodec(pFormatCtx, stream_idx, &pVideoCodecCtx);
     if(ret<0) {
         printError(ret, "视频解码器打开失败");
         return ret;
@@ -585,7 +447,6 @@ int FFmpegMediaDecoder::open(const char* input,
                              AVDictionary *dict, bool hwaccels)
 {
     int ret =0;
-
     //封装格式上下文，统领全局的结构体，保存了视频文件封装格式的相关信息
     if(!pFormatCtx)
         pFormatCtx = avformat_alloc_context();
@@ -594,8 +455,6 @@ int FFmpegMediaDecoder::open(const char* input,
     pFormatCtx->interrupt_callback.callback = interrupt_callback;
     pFormatCtx->interrupt_callback.opaque = this;
     lastFrameRealtime = av_gettime();
-
-    mIsHwaccels = hwaccels;
 
     AVDictionary* options = NULL;
     if(dict)
@@ -627,6 +486,7 @@ int FFmpegMediaDecoder::open(const char* input,
     //number of streams
     for (int i = 0; i < pFormatCtx->nb_streams; i++) {
         //流的类型
+		//pFormatCtx->streams[i]->codec->codec_type
 		enum AVMediaType codec_type = pFormatCtx->streams[i]->codecpar->codec_type;
         if(codec_type == AVMEDIA_TYPE_AUDIO) {
             audio_stream_idx = i;
@@ -661,9 +521,6 @@ void FFmpegMediaDecoder::close()
     if(pFormatCtx) {
         avformat_close_input(&pFormatCtx);
         pFormatCtx = nullptr;
-    }
-    if(hw_device_ctx) {
-        av_buffer_unref(&hw_device_ctx);
     }
 
     scaler.freeAudioResample();
@@ -766,11 +623,6 @@ int64_t FFmpegMediaDecoder::diffLastFrame(int64_t current)
     return (current - lastFrameRealtime);
 }
 
-void FFmpegMediaDecoder::stopInterrupt()
-{
-    lastFrameRealtime = 0;
-}
-
 void FFmpegMediaDecoder::setInterruptTimeout(const int microsecond)
 {
     mInterruptTimeout = microsecond;
@@ -796,7 +648,7 @@ const char* FFmpegMediaDecoder::inputfile()
     char file[1024]={0};
 
     if(pFormatCtx&&pFormatCtx->url)
-        return pFormatCtx->url;
+        memcpy(file, pFormatCtx->url, sizeof(file));
 
     return file;
 }
@@ -877,7 +729,6 @@ void FFmpegMediaDecoder::_printError(int code, const char* message)
 
 void FFmpegMediaDecoder::printError(int code, const char* message)
 {
-    qDebug()<<"Decoder printError"<<QString::fromLocal8Bit(message);
     mCallbackMutex.lock();
     if(mCallback)
         mCallback->onDecodeError(code, message);

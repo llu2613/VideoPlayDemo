@@ -18,8 +18,8 @@ public:
         qDebug("#current:%ld duration:%ld, %d%%",
                current, total, (int)(100*current/total));
     }
-    void onMergerError(int code, std::string msg) {
-
+    void onMergerError(int code, const char* msg) {
+        qDebug("FFAudioMerger Error:%s", msg);
     }
 };
 
@@ -69,11 +69,12 @@ int main(int argc, char *argv[])
 //    M3u8Parsing parsing;
 //    parsing.test();
 
-    FFAudioMerger merger;
-    merger.start("D:/test/out_recoder_audio02.wav",
-                 AV_CH_LAYOUT_MONO, AV_SAMPLE_FMT_NONE, 48000);
-    merger.merge("D:/test/qinghuaci.mp4", 60, 63);
-    merger.finish();
+//    FFAudioMerger merger;
+//    merger.start("D:/test/out_recoder_audio_m3u8file.ts",
+//                 1, AV_SAMPLE_FMT_NONE, 16000);
+//    merger.merge("D://test/20220119161256572.ts",
+//                 0, 168);
+//    merger.finish();
 
 //    useOpenGLMode(2);
 
@@ -82,8 +83,8 @@ int main(int argc, char *argv[])
     qRegisterMetaType<std::shared_ptr<MediaData>>("std::shared_ptr<MediaData>");
     qRegisterMetaType<std::shared_ptr<SampleBuffer>>("std::shared_ptr<SampleBuffer>");
 
-    FFmpegFileEncoder encoder;
-    encoder.test();
+//    FFmpegFileEncoder encoder;
+//    encoder.test();
 
 //    FFmpegFileMerger merger;
 //    merger.test2();

@@ -87,8 +87,6 @@ int FFmpegAudioMerger::merge(std::string in_file, int skipSec, int totalSec)
         if(dec_ctx) {
             skipSamples = skipSec>0?(skipSec*dec_ctx->sample_rate):0;
             mergeSamples = totalSec>0?(totalSec*dec_ctx->sample_rate):LONG_MAX;
-//            int mergeSec = duration-trimTailSec-skipSec;
-//            mergeSamples = mergeSec>1?mergeSec*dec_ctx->sample_rate:LONG_MAX;
         }
 
         /* allocate sample fifo */
@@ -100,7 +98,7 @@ int FFmpegAudioMerger::merge(std::string in_file, int skipSec, int totalSec)
         if(!has_opened) {
             ret = openOutput();
             if(ret<0)
-                print_error(ret, "Canot open output file!");
+                print_errmsg(ret, "Canot open output file!");
         }
         if(ret>=0) {
             while((ret=decoding())>=0);
@@ -115,7 +113,7 @@ int FFmpegAudioMerger::merge(std::string in_file, int skipSec, int totalSec)
 
         close();
     } else {
-        print_error(0, "Canot open input file!");
+        print_errmsg(0, "Canot open input file!");
     }
 
     skipSamples = 0;
@@ -170,7 +168,23 @@ void FFmpegAudioMerger::progress(long current, long total)
     }
 }
 
-void FFmpegAudioMerger::print_error(int code, std::string msg)
+void FFmpegAudioMerger::av_log(void *avcl, int level, const char *fmt, ...)
+{
+    char sprint_buf[1024];
+
+    va_list args;
+    int n;
+    va_start(args, fmt);
+    n = vsnprintf(sprint_buf, sizeof(sprint_buf), fmt, args);
+    va_end(args);
+
+    if(level<AV_LOG_WARNING) {
+        print_errmsg(-1, sprint_buf);
+    }
+    printf("[%s]%s\n", "FFmpegAudioMerger", sprint_buf);
+}
+
+void FFmpegAudioMerger::print_errmsg(int code, const char *msg)
 {
     std::lock_guard<std::mutex> lk(m_mutex);
 
@@ -202,8 +216,8 @@ int FFmpegAudioMerger::openOutput()
 
     ret = mRecoder.open(output_filename, in_codec_ctx->channel_layout,
                         in_codec_ctx->sample_fmt, in_codec_ctx->sample_rate,
-                        out_nb_channels>0?av_get_default_channel_layout(out_nb_channels):FF_INVALID,
-                        out_sample_fmt, out_sample_rate);
+                        out_nb_channels>0?av_get_default_channel_layout(out_nb_channels):in_codec_ctx->channel_layout,
+                        out_sample_fmt, out_sample_rate>0?out_sample_rate:in_codec_ctx->sample_rate);
 
     has_opened = true;
 
@@ -280,7 +294,7 @@ int FFmpegAudioMerger::write_frame_fifo(AVFrame *frame)
 
     if(skipFramSize>0) {
         AVFrame *input_frame;
-        if (init_input_frame(&input_frame, const_cast<AVCodecContext*>(dec_ctx), skipFramSize) < 0) {
+        if (init_input_frame(&input_frame, const_cast<AVCodecContext*>(dec_ctx), dec_ctx->frame_size) < 0) {
             av_log(NULL, AV_LOG_ERROR, "init_input_frame failed\n");
             return AVERROR_EXIT;
         }
@@ -296,8 +310,10 @@ int FFmpegAudioMerger::write_frame_fifo(AVFrame *frame)
 
     int ret = 0;
     while (mergeSamples>0 && av_audio_fifo_size(sample_fifo) >= dec_ctx->frame_size) {
+        int wrote_size = 0;
         int frame_size = FFMIN(av_audio_fifo_size(sample_fifo), dec_ctx->frame_size);
-        ret = fifo_write_encoder(frame_size);
+        ret = fifo_write_encoder(frame_size, &wrote_size);
+        mergeSamples -= wrote_size;
         if(ret<0) {
             break;
         }
@@ -306,13 +322,15 @@ int FFmpegAudioMerger::write_frame_fifo(AVFrame *frame)
     return 0;
 }
 
-int FFmpegAudioMerger::fifo_write_encoder(int frame_size)
+int FFmpegAudioMerger::fifo_write_encoder(int frame_size, int *ret_wrote_size)
 {
     int ret=0;
     const AVCodecContext *dec_ctx = audioCodecContext();
+    if(frame_size>dec_ctx->frame_size)
+        frame_size = dec_ctx->frame_size;
 
     AVFrame *input_frame;
-    if (init_input_frame(&input_frame, const_cast<AVCodecContext*>(dec_ctx), frame_size) < 0) {
+    if (init_input_frame(&input_frame, const_cast<AVCodecContext*>(dec_ctx), dec_ctx->frame_size) < 0) {
         av_log(NULL, AV_LOG_ERROR, "init_output_frame failed\n");
         return AVERROR_EXIT;
     }
@@ -324,8 +342,8 @@ int FFmpegAudioMerger::fifo_write_encoder(int frame_size)
     }
 
     ret = mRecoder.addData(input_frame, nullptr);
-    if(ret>=0) {
-        mergeSamples -= frame_size;
+    if(ret>=0 && ret_wrote_size) {
+        *ret_wrote_size = frame_size;
     }
     av_frame_free(&input_frame);
 
@@ -334,15 +352,21 @@ int FFmpegAudioMerger::fifo_write_encoder(int frame_size)
 
 int FFmpegAudioMerger::flush_sample_fifo()
 {
-    if(samples<=skipSamples || mergeSamples<=0) {
+    if(samples<=skipSamples || mergeSamples<0) {
         return 0;
     }
 
     const AVCodecContext *dec_ctx = audioCodecContext();
 
-    while (dec_ctx && mergeSamples>0) {
-        int frame_size = FFMIN(av_audio_fifo_size(sample_fifo), FFMIN(dec_ctx->frame_size, mergeSamples));
-        fifo_write_encoder(frame_size);
+    int ret = 0;
+    while (mergeSamples>0 && av_audio_fifo_size(sample_fifo)) {
+        int wrote_size = 0;
+        int frame_size = FFMIN3(av_audio_fifo_size(sample_fifo), dec_ctx->frame_size, mergeSamples);
+        ret = fifo_write_encoder(frame_size, &wrote_size);
+        mergeSamples -= wrote_size;
+        if(ret<0) {
+            break;
+        }
     }
 
     return 0;

@@ -3,7 +3,6 @@
 
 #include <mutex>
 #include <memory>
-#include <list>
 #include "FFmpegMediaScaler.h"
 #include "model/MediaData.h"
 
@@ -61,7 +60,6 @@ public:
     int64_t diffLastFrame(int64_t current);
     void setInterruptTimeout(const int microsecond);
     const int interruptTimeout();
-    void stopInterrupt();
 
     void _setStatus(Status status);
     void _printError(int code, const char* message);
@@ -92,8 +90,6 @@ protected:
 private:
     AVFormatContext* pFormatCtx;
     AVCodecContext *pAudioCodecCtx, *pVideoCodecCtx;
-    AVBufferRef *hw_device_ctx;
-    std::list<enum AVPixelFormat> hw_formats;
     int audio_stream_idx, video_stream_idx;
 
     long readFailedCnt;
@@ -113,13 +109,10 @@ private:
     int initVideoCodec(AVFormatContext *pFormatCtx, int stream_idx);
     int openCodec(AVFormatContext *pFormatCtx,
                   int stream_idx, AVCodecContext **pCodeCtx);
-    int hw_decoder_init(AVCodecContext *ctx, const enum AVHWDeviceType type);
-    const AVCodecHWConfig *find_hwaccel(const AVCodec *codec, enum AVPixelFormat pix_fmt);
+    AVHWAccel *ff_find_hwaccel(enum AVCodecID codec_id, enum AVPixelFormat pix_fmt);
 	int openHwCodec(AVFormatContext *pFormatCtx,
 				int stream_idx, AVCodecContext **pCodeCtx);
-    int decode_video_frame(AVCodecContext *pCodecCtx, AVFrame *frame, AVPacket *packet);
-    int decode_video_frame_hw(AVCodecContext *pCodecCtx, AVFrame *frame, AVPacket *packet);
-
+				
     void fillPixelRGB24(MediaData *mediaData, AVFrame *frame, int pixelWidth, int pixelHeight);
     void fillPixelYUV420P(MediaData *mediaData, AVFrame *frame, int pixelWidth, int pixelHeight);
 

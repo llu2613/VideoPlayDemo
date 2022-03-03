@@ -84,7 +84,7 @@ private:
 	int filter_encode_write_frame(AVFrame *frame, unsigned int stream_index);
     int flush_audio_fifo(unsigned int stream_index);
 	int flush_encoder(unsigned int stream_index);
-
+    void av_log(void *avcl, int level, const char *fmt, ...);
 
 	inline char* wrap_av_err2str(int errnum)
 	{

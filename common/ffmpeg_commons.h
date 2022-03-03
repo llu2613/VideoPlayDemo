@@ -40,5 +40,34 @@ inline char* wrap_av_err2str(int errnum)
     memset(str, 0, sizeof(str));
     return av_make_error_string(str, AV_ERROR_MAX_STRING_SIZE, errnum);
 }
+/*
+int ff_print_frame(AVFrame *frame)
+{
+    uint8_t *buffer = NULL;
+    int size;
+    int ret = 0;
 
+    size = av_image_get_buffer_size((AVPixelFormat)frame->format, frame->width,
+                                    frame->height, 1);
+    buffer = (uint8_t*)av_malloc(size);
+    if (!buffer) {
+        fprintf(stderr, "Can not alloc buffer\n");
+        ret = AVERROR(ENOMEM);
+        av_freep(&buffer);
+        return -1;
+    }
+    ret = av_image_copy_to_buffer(buffer, size,
+                                  (const uint8_t * const *)frame->data,
+                                  (const int *)frame->linesize, (AVPixelFormat)frame->format,
+                                  frame->width, frame->height, 1);
+    if (ret < 0) {
+        fprintf(stderr, "Can not copy image to buffer\n");
+        av_freep(&buffer);
+        return -1;
+    }
+
+    av_freep(&buffer);
+    return 0;
+}
+*/
 #endif // FFMPEGCOMMON_H

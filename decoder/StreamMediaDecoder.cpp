@@ -8,10 +8,6 @@ StreamMediaDecoder::StreamMediaDecoder(QObject *parent)
     fp_pcm = 0;
     fp_yuv = 0;
 
-    //av_register_all();
-    //avcodec_register_all();
-    //avformat_network_init();
-
     mediaDecoder.setCallback(this);
     syncer = new AVSynchronizer;
 }
@@ -32,8 +28,7 @@ void StreamMediaDecoder::setOutVideo2(int width, int height)
 {
     enum AVPixelFormat fmt;
     mediaDecoder.getOutVideoParams(&fmt, NULL, NULL);
-//    mediaDecoder.setOutVideo(fmt, width, height);
-    mediaDecoder.setOutVideo(AV_PIX_FMT_RGB24, width, height);
+    mediaDecoder.setOutVideo(fmt, width, height);
 }
 
 AVSynchronizer* StreamMediaDecoder::getSynchronizer()
@@ -99,7 +94,9 @@ void StreamMediaDecoder::run()
     video_ts = 0;
     syncer->reset();
 
-    retCode = mediaDecoder.open(url, mIsHwaccels);
+    AVDictionary* options = NULL;
+//    av_dict_set(&options, "rtsp_transport", "tcp", 0);
+    retCode = mediaDecoder.open(url, options, mIsHwaccels);
 
     bool isDecoding = true;
     for (int loopCnt=0;isDecoding;) {

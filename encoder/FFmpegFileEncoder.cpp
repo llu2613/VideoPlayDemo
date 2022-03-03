@@ -48,7 +48,6 @@ int FFmpegFileEncoder::open_input_file(const char *filename)
 
 	//ifmt_ctx = NULL;
 	if ((ret = avformat_open_input(&ifmt_ctx, filename, NULL, NULL)) < 0) {
-		print_error("OpenInput", ret);
 		av_log(NULL, AV_LOG_ERROR, "Cannot open input file\n");
 		return ret;
 	}
@@ -682,7 +681,8 @@ int FFmpegFileEncoder::encode_write_frame(AVFrame *filt_frame, unsigned int stre
 
         ret = avcodec_send_frame(stream_ctx[stream_index].enc_ctx, filt_frame);
         if(ret != 0) {
-            print_error("avcodec_send_frame", ret);
+            av_log(NULL, AV_LOG_ERROR, "#%d enc avcodec_send_packet %s",
+                   stream_index, wrap_av_err2str(ret));
             return ret;
         }
         while (1) {
@@ -858,6 +858,20 @@ int FFmpegFileEncoder::flush_encoder(unsigned int stream_index)
 	return ret;
 }
 
+void FFmpegFileEncoder::av_log(void *avcl, int level, const char *fmt, ...)
+{
+    char sprint_buf[1024];
+
+	va_list args;
+	int n;
+	va_start(args, fmt);
+	n = vsnprintf(sprint_buf, sizeof(sprint_buf), fmt, args);
+	va_end(args);
+	
+    if(level<AV_LOG_WARNING)
+        printf("[%s]%s\n", "FFmpegFileEncoder", sprint_buf);
+}
+
 
 int FFmpegFileEncoder::test()
 {
@@ -865,7 +879,7 @@ int FFmpegFileEncoder::test()
 	//输入要进行格式转换的文件
     char intput_file[] = "D:\\test\\86E13DDC-7CFA-4B9C-A875-476257CD6A13_1625045310.flv";
 	//输出转换后的文件
-    char output_file[] = "D:\\test\\86E13DDC_out_.webm";
+    char output_file[] = "D:\\test\\86E13DDC_out_.ts";
 #else //网络文件
 	//输入要进行格式转换的文件
     char intput_file[] = "D:\\test\\qinghuaci.mp4";
@@ -928,7 +942,8 @@ int FFmpegFileEncoder::transcoding(const char *intput_file, const char *output_f
             avcodec_send_packet(stream_ctx[stream_index].dec_ctx, packet);
             if (ret != 0) {
                 av_frame_free(&frame);
-                print_error("avcodec_send_packet", ret);
+                av_log(NULL, AV_LOG_ERROR, "#%d dec avcodec_send_packet %s",
+                       stream_index, wrap_av_err2str(ret));
                 break;
             }
             for (int i=0;i<100;i++) {

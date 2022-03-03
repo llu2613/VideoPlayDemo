@@ -36,7 +36,7 @@ protected:
 
 private:
     YUVGLWidget *video;
-//    VideoBuffer videoBuffer;
+    VideoBuffer videoBuffer;
 
     StreamMediaDecoder *decoder;
 

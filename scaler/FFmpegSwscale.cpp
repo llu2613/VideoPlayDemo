@@ -22,9 +22,12 @@ int FFmpegSwscale::init(AVCodecContext *pCodecCtx,
 int FFmpegSwscale::init(enum AVPixelFormat in_pixel_fmt, int in_width, int in_height,
                         enum AVPixelFormat out_pixel_fmt, int out_width, int out_height)
 {
+    in_frame_fmt = in_pixel_fmt;
+    in_frame_width = in_width;
+    in_frame_height = in_height;
+    out_frame_fmt = out_pixel_fmt;
     out_frame_width = out_width;
     out_frame_height = out_height;
-    out_frame_fmt = out_pixel_fmt;
 
     swsCtx = sws_getContext(in_width,in_height,in_pixel_fmt,
                             out_width, out_height, out_pixel_fmt,

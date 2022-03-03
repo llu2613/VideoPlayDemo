@@ -35,6 +35,9 @@ public:
 
     bool isReady();
 
+protected:
+    void print_errmsg(int code, const char* msg);
+
 private:
     int init_output_frame(AVFrame **frame,
         AVCodecContext *output_codec_context, int frame_size);
@@ -45,6 +48,7 @@ private:
     int encode_write_frame(AVFrame *filt_frame, unsigned int stream_index);
     int flush_audio_fifo(int stream_index);
     int flush_encoder(AVFormatContext *ofmt_ctx,int stream_index);
+    void av_log(void *avcl, int level, const char *fmt, ...);
 
     AVFormatContext *ofmt_ctx;
     AVStream *out_stream;
