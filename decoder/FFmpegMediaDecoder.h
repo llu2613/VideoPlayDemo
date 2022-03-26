@@ -65,7 +65,6 @@ public:
 
     void _setStatus(Status status);
     void _printError(int code, const char* message);
-    long readFailedCount();
 
 protected:
     const AVFormatContext* formatContext();
@@ -96,7 +95,6 @@ private:
     std::list<enum AVPixelFormat> hw_formats;
     int audio_stream_idx, video_stream_idx;
 
-    long readFailedCnt;
     long audioFrameCnt, videoFrameCnt;
 
     FFmpegMediaScaler scaler;

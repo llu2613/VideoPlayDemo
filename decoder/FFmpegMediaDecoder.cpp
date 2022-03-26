@@ -33,7 +33,6 @@ FFmpegMediaDecoder::FFmpegMediaDecoder()
     pVideoCodecCtx = nullptr;
     hw_device_ctx = nullptr;
 
-    readFailedCnt = 0;
     audioFrameCnt = 0;
     videoFrameCnt = 0;
     audio_stream_idx = -1;
@@ -176,6 +175,7 @@ int FFmpegMediaDecoder::decode_video_frame_hw(AVCodecContext *pCodecCtx, AVFrame
         if (errcode == AVERROR(EAGAIN) || errcode == AVERROR_EOF) {
             break;
         } else if (errcode < 0) {
+            ret = errcode;
             print_error("Error while decoding", ret);
             break;
         }
@@ -605,18 +605,17 @@ int FFmpegMediaDecoder::open(const char* input,
 
     //2.打开输入视频文件
     ret = avformat_open_input(&pFormatCtx, input, NULL, &options);
+    av_dict_free(&options);
     if (ret != 0) {
-        av_dict_free(&options);
+        qDebug()<<QString::fromLocal8Bit(input);
         print_error("avformat_open_input", ret);
-        printError(ret, "无法打开输入媒体文件");
         return ret;
     }
-    av_dict_free(&options);
 
     //3.获取视频文件信息
     ret = avformat_find_stream_info(pFormatCtx,NULL);
     if (ret < 0) {
-        printError(ret, "无法获取媒体文件信息");
+        print_error("avformat_find_stream_info", ret);
         return ret;
     }
 
@@ -625,19 +624,36 @@ int FFmpegMediaDecoder::open(const char* input,
     audio_stream_idx = -1;
     video_stream_idx = -1;
     //number of streams
+    int audio_stream_count = 0;
+    int video_stream_count = 0;
     for (int i = 0; i < pFormatCtx->nb_streams; i++) {
         //流的类型
 		enum AVMediaType codec_type = pFormatCtx->streams[i]->codecpar->codec_type;
         if(codec_type == AVMEDIA_TYPE_AUDIO) {
-            audio_stream_idx = i;
-            ret = initAudioCodec(pFormatCtx, i);
+            audio_stream_count++;
+            if(audio_stream_idx==-1) {
+                audio_stream_idx = i;
+                ret = initAudioCodec(pFormatCtx, i);
+            }
         } else if (codec_type == AVMEDIA_TYPE_VIDEO) {
-            video_stream_idx = i;
-            ret = initVideoCodec(pFormatCtx, i);
+            video_stream_count++;
+            if(video_stream_idx==-1) {
+                video_stream_idx = i;
+                ret = initVideoCodec(pFormatCtx, i);
+            }
         }
     }
+    if(audio_stream_count>1) {
+        char buf[256];
+        sprintf(buf, "find more %d audio stream", audio_stream_count);
+        printError(0, buf);
+    }
+    if(video_stream_count>1) {
+        char buf[256];
+        sprintf(buf, "find more %d video stream", audio_stream_count);
+        printError(0, buf);
+    }
 
-    readFailedCnt = 0;
     audioFrameCnt = 0;
     videoFrameCnt = 0;
 
@@ -700,14 +716,11 @@ int FFmpegMediaDecoder::decoding()
     if(readRet < 0) {
         if(AVERROR_EOF==readRet) {
             mStatus = EndOfFile;
-            return readRet;
         }
-        readFailedCnt++;
         print_error("av_read_frame", readRet);
         return readRet;
     }
 
-    readFailedCnt = 0;
     lastFrameRealtime = av_gettime();
 
     //解码
@@ -779,11 +792,6 @@ void FFmpegMediaDecoder::setInterruptTimeout(const int microsecond)
 const int FFmpegMediaDecoder::interruptTimeout()
 {
     return mInterruptTimeout;
-}
-
-long FFmpegMediaDecoder::readFailedCount()
-{
-    return readFailedCnt;
 }
 
 bool FFmpegMediaDecoder::isHwaccels()

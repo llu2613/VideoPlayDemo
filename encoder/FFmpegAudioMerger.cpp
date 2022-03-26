@@ -217,7 +217,8 @@ int FFmpegAudioMerger::openOutput()
     ret = mRecoder.open(output_filename, in_codec_ctx->channel_layout,
                         in_codec_ctx->sample_fmt, in_codec_ctx->sample_rate,
                         out_nb_channels>0?av_get_default_channel_layout(out_nb_channels):in_codec_ctx->channel_layout,
-                        out_sample_fmt, out_sample_rate>0?out_sample_rate:in_codec_ctx->sample_rate);
+                        out_sample_fmt!=AV_SAMPLE_FMT_NONE?out_sample_fmt:in_codec_ctx->sample_fmt,
+                        out_sample_rate>0?out_sample_rate:in_codec_ctx->sample_rate);
 
     has_opened = true;
 

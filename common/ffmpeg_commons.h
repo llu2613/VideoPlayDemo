@@ -36,9 +36,12 @@ extern "C" {
 
 inline char* wrap_av_err2str(int errnum)
 {
-    static char str[AV_ERROR_MAX_STRING_SIZE];
-    memset(str, 0, sizeof(str));
-    return av_make_error_string(str, AV_ERROR_MAX_STRING_SIZE, errnum);
+    static char errbuf[AV_ERROR_MAX_STRING_SIZE];
+    memset(errbuf, 0, sizeof(errbuf));
+    if(av_strerror(errnum, errbuf, AV_ERROR_MAX_STRING_SIZE)<0) {
+        return strerror(AVUNERROR(errnum));
+    }
+    return errbuf;
 }
 /*
 int ff_print_frame(AVFrame *frame)

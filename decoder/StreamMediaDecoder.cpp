@@ -114,10 +114,8 @@ void StreamMediaDecoder::run()
 
         retCode = mediaDecoder.decoding();
         if(retCode<0) {
-            if(mediaDecoder.status()==FFmpegMediaDecoder::Broken
-                    ||mediaDecoder.readFailedCount()>10) {
-                break;
-            }
+            qDebug()<<"----decode-failure----"<<mediaDecoder.status();
+            break;
         }
 
         for(int i=0; isDecoding&&i<20; i++) {
