@@ -31,7 +31,7 @@ public:
     void removeSync(int sourceId);
     void addData(int cardId, int sourceId, MediaData *data);
 
-    void setSourceOpen(int sourceId, bool isOpen);
+    void setSoundOpen(int sourceId, bool isOpen);
     int cardVolume(int cardId);
     void setCardVolume(int cardId, int volume);
 

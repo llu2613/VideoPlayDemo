@@ -42,7 +42,8 @@ private:
     QMutex mStopMutex;
     bool mStopFlag;
     AVSynchronizer *syncer;
-    double audio_ts, video_ts;
+    unsigned long audio_ts, video_ts;
+    double audio_base_time, video_base_time;
 
     QString mInputUrl;
     bool mIsHwaccels;

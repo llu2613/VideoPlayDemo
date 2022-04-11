@@ -82,9 +82,9 @@ void SmtAudioPlayer::addData(int cardId, int sourceId, MediaData *data)
 
     unsigned char *buf = data->data[0];
     int len = data->datasize[0];
-    double audio_pts_second = data->pts*data->time_base_d;
+    unsigned long audio_pts = data->pts;
     if(isSoundOpen) {
-        SdlAudioPlayer::addData(cardId, sourceId, (Uint8*)buf, len, audio_pts_second);
+        SdlAudioPlayer::addData(cardId, sourceId, (Uint8*)buf, len, audio_pts);
     }
 
     //计算波形图
@@ -94,7 +94,7 @@ void SmtAudioPlayer::addData(int cardId, int sourceId, MediaData *data)
     mWaveformProcessor.addSample(sourceId, b);
 }
 
-void SmtAudioPlayer::setSourceOpen(int sourceId, bool isOpen)
+void SmtAudioPlayer::setSoundOpen(int sourceId, bool isOpen)
 {
     LockedMapLocker lk(mSourceInfoMap.mutex());
 

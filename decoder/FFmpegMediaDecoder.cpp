@@ -301,7 +301,8 @@ void FFmpegMediaDecoder::audioResampledData(AVPacket *packet, uint8_t *sampleBuf
         mediaData->nb_samples = samples;
         mediaData->sample_rate = scaler.outAudioRate();
         mediaData->channels = scaler.outAudioChannels();
-        mediaData->pts = packet->pts;
+        mediaData->pts = audio_pts;
+        audio_pts += packet->duration;
         mediaData->duration = packet->duration;
         AVStream *stream = pFormatCtx->streams[packet->stream_index];
         mediaData->time_base_d = av_q2d(stream->time_base);
@@ -322,7 +323,8 @@ void FFmpegMediaDecoder::videoScaledData(AVFrame *frame, AVPacket *packet, int p
         mediaData->pixel_format = scaler.outVideoFmt();
         mediaData->width = scaler.outVideoWidth();
         mediaData->height = pixelHeight;
-        mediaData->pts = packet->pts;
+        mediaData->pts = video_pts;
+        video_pts += packet->duration;
         mediaData->duration = packet->duration;
         mediaData->repeat_pict = frame->repeat_pict; //重复显示次数
         mediaData->best_timestamp = frame->best_effort_timestamp;
@@ -607,7 +609,7 @@ int FFmpegMediaDecoder::open(const char* input,
     ret = avformat_open_input(&pFormatCtx, input, NULL, &options);
     av_dict_free(&options);
     if (ret != 0) {
-        qDebug()<<QString::fromLocal8Bit(input);
+        //qDebug()<<QString::fromLocal8Bit(input);
         print_error("avformat_open_input", ret);
         return ret;
     }
@@ -642,6 +644,7 @@ int FFmpegMediaDecoder::open(const char* input,
                 ret = initVideoCodec(pFormatCtx, i);
             }
         }
+        av_dump_format(pFormatCtx, i, input, 0);
     }
     if(audio_stream_count>1) {
         char buf[256];
@@ -656,6 +659,8 @@ int FFmpegMediaDecoder::open(const char* input,
 
     audioFrameCnt = 0;
     videoFrameCnt = 0;
+    audio_pts = 0;
+    video_pts = 0;
 
     mStatus = Ready;
 

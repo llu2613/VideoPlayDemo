@@ -5,6 +5,7 @@
 #include "FFmpegAudioRecorder.h"
 #include "FFMergerCallback.h"
 #include <mutex>
+#include <atomic>
 
 class FFmpegAudioMerger : private FFmpegMediaDecoder
 {
@@ -18,6 +19,7 @@ public:
                enum AVSampleFormat out_sample_fmt,
                int out_sample_rate);
 
+    void setLogLevel(int level);
     void setCallback(FFMergerCallback *callback);
 
     int merge(std::string in_file);
@@ -46,12 +48,14 @@ private:
     void av_log(void *avcl, int level, const char *fmt, ...);
     void progress(long current, long total);
     void print_errmsg(int code, const char *msg);
+    void merge_statistics();
 
     std::mutex m_mutex;
     std::string out_file;
     int out_nb_channels;
     enum AVSampleFormat out_sample_fmt;
     int out_sample_rate;
+    std::atomic_bool isStopFlag;
     int64_t skipSamples;
     int64_t mergeSamples;
 
@@ -59,8 +63,9 @@ private:
     FFmpegAudioRecorder mRecoder;
     FFMergerCallback *mCallback;
     AVAudioFifo *sample_fifo;
+    int log_level;
     int64_t duration;
-    int64_t samples;
+    int64_t samples, skipped_samples, written_samples;
 
 };
 

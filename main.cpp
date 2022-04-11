@@ -15,12 +15,17 @@ public:
         setCallback(this);
     }
     void onMergerProgress(long current, long total) {
-        qDebug("#current:%ld duration:%ld, %d%%",
-               current, total, (int)(100*current/total));
+        int ratio = (int)(100*current/total);
+        if(progress!=ratio) {
+            progress = ratio;
+            qDebug("#current:%ld duration:%ld, %d%%", current, total, ratio);
+        }
     }
     void onMergerError(int code, const char* msg) {
         qDebug("FFAudioMerger Error:%s", msg);
     }
+private:
+    int progress;
 };
 
 void useOpenGLMode(int openGLMode)
@@ -59,7 +64,6 @@ void sdlTest(){
     FFmpegMediaDecoder decoder;
     for(;;) {
         decoder.open("rtsp://192.168.1.151:554/audio_stereo", NULL, false);
-
         decoder.close();
     }
 }
@@ -68,14 +72,14 @@ int main(int argc, char *argv[])
 {
 //    M3u8Parsing parsing;
 //    parsing.test();
-
-//    FFAudioMerger merger;
-//    merger.start("D:/test/out_recoder_audio_m3u8file.ts",
-//                 1, AV_SAMPLE_FMT_NONE, 16000);
-//    merger.merge("D://test/20220119161256572.ts",
-//                 0, 168);
-//    merger.finish();
-
+/*
+    FFAudioMerger merger;
+    merger.start("D:/test/1hour_test0___.aac",
+                 0, AV_SAMPLE_FMT_NONE, 32000);
+    merger.merge("http://192.168.1.63:9080/m3u8file/DD79CDE0-21A6-4251-AE28-65A8096D574E1538.m3u8",
+                 40, 60*60);
+    merger.finish();
+*/
 //    useOpenGLMode(2);
 
     QApplication a(argc, argv);

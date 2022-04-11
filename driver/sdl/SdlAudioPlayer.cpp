@@ -105,7 +105,7 @@ void SdlAudioPlayer::quiteAudioSystem()
 }
 
 void SdlAudioPlayer::addData(int cardId, int sourceId, Uint8 *buf, int bufLen,
-                             double timestamp)
+                             unsigned long timestamp)
 {
     if(cardId>=0&&cardId<MAX_CARD_NUM) {
     } else {

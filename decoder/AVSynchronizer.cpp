@@ -17,66 +17,78 @@ void AVSynchronizer::reset()
 {
     std::lock_guard<std::mutex> lk(mMutex);
 
-    audio_timestamp = 0;
-    video_timestamp = 0;
-    decode_timestamp = 0;
+    audio_play_ts = 0;
+    video_play_ts = 0;
+    audio_decode_ts = 0;
+    video_decode_ts = 0;
 }
 
-void AVSynchronizer::setDecodingTs(double time)
+void AVSynchronizer::setAudioDecodingTs(unsigned long ts)
 {
     std::lock_guard<std::mutex> lk(mMutex);
 
-    decode_timestamp = time;
+    audio_decode_ts = ts;
 }
 
-void AVSynchronizer::setAudioPlayingTs(int64_t pts, double time_base)
-{
-    setAudioPlayingTs(pts*time_base);
-}
-void AVSynchronizer::setAudioPlayingTs(double time)
+void AVSynchronizer::setVideoDecodingTs(unsigned long ts)
 {
     std::lock_guard<std::mutex> lk(mMutex);
 
-    audio_timestamp = time;
+    video_decode_ts = ts;
 }
 
-void AVSynchronizer::setVideoPlayingTs(int64_t pts, double time_base)
-{
-    setVideoPlayingTs(pts*time_base);
-}
-void AVSynchronizer::setVideoPlayingTs(double time)
+void AVSynchronizer::setAudioPlayingTs(unsigned long ts)
 {
     std::lock_guard<std::mutex> lk(mMutex);
 
-    video_timestamp = time;
+    audio_play_ts = ts;
 }
 
-double AVSynchronizer::getAudioDecodeDelay()
+void AVSynchronizer::setVideoPlayingTs(unsigned long ts)
 {
     std::lock_guard<std::mutex> lk(mMutex);
 
-    if(audio_timestamp) {
-        return decode_timestamp-audio_timestamp;
-    }
-    return 0;
+    video_play_ts = ts;
 }
 
-double AVSynchronizer::getVideoDecodeDelay()
+unsigned long AVSynchronizer::audioDecodingTs()
 {
     std::lock_guard<std::mutex> lk(mMutex);
 
-    if(video_timestamp) {
-        return decode_timestamp-video_timestamp;
-    }
-    return 0;
+    return audio_decode_ts;
 }
 
-double AVSynchronizer::getAudioVideoDelay()
+unsigned long AVSynchronizer::videoDecodingTs()
 {
     std::lock_guard<std::mutex> lk(mMutex);
 
-    if(audio_timestamp&&video_timestamp) {
-        return audio_timestamp-video_timestamp;
-    }
-    return 0;
+    return video_decode_ts;
+}
+
+unsigned long AVSynchronizer::audioPlayingTs()
+{
+    std::lock_guard<std::mutex> lk(mMutex);
+
+    return audio_play_ts;
+}
+
+unsigned long AVSynchronizer::videoPlayingTs()
+{
+    std::lock_guard<std::mutex> lk(mMutex);
+
+    return video_play_ts;
+}
+
+unsigned long AVSynchronizer::getAudioDelayTs()
+{
+    std::lock_guard<std::mutex> lk(mMutex);
+
+    return audio_play_ts!=0?audio_decode_ts-audio_play_ts:0;
+}
+
+unsigned long AVSynchronizer::getVideoDelayTs()
+{
+    std::lock_guard<std::mutex> lk(mMutex);
+
+    return video_play_ts!=0?video_decode_ts-video_play_ts:0;
 }

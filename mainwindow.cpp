@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <QDebug>
+#include "webstreamdialog.h"
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -74,4 +75,17 @@ void MainWindow::onOpenGLButtonGroupClicked(bool clicked)
     default:
         break;
     }
+}
+
+void MainWindow::on_pushButton_web_stream_clicked()
+{
+    WebStreamDialog dialog;
+    dialog.exec();
+
+}
+
+void MainWindow::on_pushButton_2_clicked()
+{
+    WebStreamDialog dialog;
+    dialog.exec();
 }

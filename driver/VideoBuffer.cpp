@@ -83,7 +83,7 @@ void VideoBuffer::run()
             if(data) {
                 mSyncMutex.lock();
                 if(mSync) {
-                    mSync->setVideoPlayingTs(data->pts, data->time_base_d);
+                    mSync->setVideoPlayingTs(data->pts);
                 }
                 mSyncMutex.unlock();
                 std::shared_ptr<MediaData> mediaData(data);

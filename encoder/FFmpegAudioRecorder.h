@@ -33,10 +33,11 @@ public:
 
     void close();
 
+    void setLogLevel(int level);
     bool isReady();
 
 protected:
-    void print_errmsg(int code, const char* msg);
+    virtual void print_errmsg(int code, const char* msg);
 
 private:
     int init_output_frame(AVFrame **frame,
@@ -44,11 +45,13 @@ private:
     int write_samples_to_fifo(AVAudioFifo *fifo,
         uint8_t **converted_input_samples,
         const int nb_samples);
-    int encode_write_frame_fifo(AVFrame *filt_frame, unsigned int stream_index);
-    int encode_write_frame(AVFrame *filt_frame, unsigned int stream_index);
+    int encode_write_frame_fifo(AVFrame *filt_frame, int stream_index);
+    int encode_write_frame(AVFrame *filt_frame, int stream_index);
     int flush_audio_fifo(int stream_index);
     int flush_encoder(AVFormatContext *ofmt_ctx,int stream_index);
     void av_log(void *avcl, int level, const char *fmt, ...);
+    void dump_codec(AVCodec* codec);
+    void statistics();
 
     AVFormatContext *ofmt_ctx;
     AVStream *out_stream;
@@ -59,7 +62,9 @@ private:
     int audio_data_size;
 
     AVAudioFifo *audio_fifo;
-    int audio_pts;
+    int64_t audio_pts, write_pts;
+    int64_t enc_samples;
+    int log_level;
 
 };
 

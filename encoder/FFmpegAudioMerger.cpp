@@ -24,6 +24,8 @@ FFmpegAudioMerger::FFmpegAudioMerger()
     sample_fifo = nullptr;
     duration = 0;
     samples = 0;
+    skipped_samples = 0;
+    written_samples = 0;
 
     out_nb_channels = FF_INVALID;
     out_sample_fmt = AV_SAMPLE_FMT_NONE;
@@ -31,13 +33,17 @@ FFmpegAudioMerger::FFmpegAudioMerger()
     skipSamples = 0;
     mergeSamples = LONG_MAX;
 
-    av_log_set_level(AV_LOG_WARNING);
-//    av_log_set_callback(ff_log_callback);
+    log_level = AV_LOG_INFO;
 }
 
 FFmpegAudioMerger::~FFmpegAudioMerger()
 {
 
+}
+
+void FFmpegAudioMerger::setLogLevel(int level)
+{
+    log_level = level;
 }
 
 void FFmpegAudioMerger::setCallback(FFMergerCallback *callback)
@@ -82,11 +88,14 @@ int FFmpegAudioMerger::merge(std::string in_file, int skipSec, int totalSec)
             duration = st->duration*st->time_base.num/st->time_base.den;
         }
         samples = 0;
+        skipped_samples = 0;
+        written_samples = 0;
 
         /* calculate samples */
         if(dec_ctx) {
             skipSamples = skipSec>0?(skipSec*dec_ctx->sample_rate):0;
             mergeSamples = totalSec>0?(totalSec*dec_ctx->sample_rate):LONG_MAX;
+            qDebug()<<"skipSamples:"<<skipSamples<<"mergeSamples:"<<mergeSamples;
         }
 
         /* allocate sample fifo */
@@ -101,7 +110,8 @@ int FFmpegAudioMerger::merge(std::string in_file, int skipSec, int totalSec)
                 print_errmsg(ret, "Canot open output file!");
         }
         if(ret>=0) {
-            while((ret=decoding())>=0);
+            isStopFlag = false;
+            while((ret=decoding())>=0&&!isStopFlag);
         }
 
         /* delete sample fifo */
@@ -119,7 +129,18 @@ int FFmpegAudioMerger::merge(std::string in_file, int skipSec, int totalSec)
     skipSamples = 0;
     mergeSamples = LONG_MAX;
 
+    merge_statistics();
+
     return ret;
+}
+
+void FFmpegAudioMerger::merge_statistics()
+{
+    char text[4096];
+    sprintf(text, "merge:{ samples:%d, skipped_samples:%d, written_samples:%d }\n",
+            samples, skipped_samples, written_samples);
+
+    av_log(NULL, AV_LOG_INFO, text);
 }
 
 void FFmpegAudioMerger::finish()
@@ -178,10 +199,8 @@ void FFmpegAudioMerger::av_log(void *avcl, int level, const char *fmt, ...)
     n = vsnprintf(sprint_buf, sizeof(sprint_buf), fmt, args);
     va_end(args);
 
-    if(level<AV_LOG_WARNING) {
+    if(level<=log_level)
         print_errmsg(-1, sprint_buf);
-    }
-    printf("[%s]%s\n", "FFmpegAudioMerger", sprint_buf);
 }
 
 void FFmpegAudioMerger::print_errmsg(int code, const char *msg)
@@ -237,29 +256,31 @@ int FFmpegAudioMerger::write_samples_to_fifo(AVAudioFifo *fifo,
     uint8_t **converted_input_samples,
     const int nb_samples)
 {
-    int error;
+    int ret;
 
-    if ((error = av_audio_fifo_realloc(fifo, av_audio_fifo_size(fifo) + nb_samples)) < 0) {
+    ret = av_audio_fifo_realloc(fifo, av_audio_fifo_size(fifo) + nb_samples);
+    if (ret < 0) {
         av_log(NULL, AV_LOG_ERROR, "Could not reallocate FIFO\n");
-        return error;
+        return ret;
     }
 
-    if (av_audio_fifo_write(fifo, (void **)converted_input_samples,
-        nb_samples) < nb_samples) {
+    ret = av_audio_fifo_write(fifo, (void **)converted_input_samples, nb_samples);
+    if (ret < nb_samples) {
         av_log(NULL, AV_LOG_ERROR, "Could not write data to FIFO\n");
-        return AVERROR_EXIT;
+        return ret;
     }
-    return 0;
+
+    return ret;
 }
 
 int FFmpegAudioMerger::init_input_frame(AVFrame **frame,
         AVCodecContext *input_codec_context, int frame_size)
 {
-    int error;
+    int ret;
 
     if (!(*frame = av_frame_alloc())) {
         av_log(NULL, AV_LOG_ERROR, "Could not allocate output frame\n");
-        return AVERROR_EXIT;
+        return -1;
     }
 
     (*frame)->nb_samples = frame_size;
@@ -267,54 +288,70 @@ int FFmpegAudioMerger::init_input_frame(AVFrame **frame,
     (*frame)->format = input_codec_context->sample_fmt;
     (*frame)->sample_rate = input_codec_context->sample_rate;
 
-    if ((error = av_frame_get_buffer(*frame, 0)) < 0) {
+    ret = av_frame_get_buffer(*frame, 0);
+    if (ret < 0) {
         av_log(NULL, AV_LOG_ERROR, "Could not allocate output frame samples (error '%s')\n",
-            wrap_av_err2str(error));
+            wrap_av_err2str(ret));
         av_frame_free(frame);
-        return error;
+        return ret;
     }
 
-    return 0;
+    return ret;
 }
 
 int FFmpegAudioMerger::write_frame_fifo(AVFrame *frame)
 {
+    int ret = 0;
     const AVCodecContext *dec_ctx = audioCodecContext();
 
-    if(mergeSamples<=0)
+    if(written_samples>=mergeSamples) {
+        isStopFlag = true;
         return 0;
+    }
+
+    if(samples<=skipSamples) {
+        return 0;
+    }
 
     write_samples_to_fifo(sample_fifo, frame->data, frame->nb_samples);
     int audio_fifo_size = av_audio_fifo_size(sample_fifo);
     if (audio_fifo_size < dec_ctx->frame_size) {
         return 0;
     }
-
-    int skipFramSize = skipSamples-samples>dec_ctx->frame_size?
-                dec_ctx->frame_size:(skipSamples>samples?skipSamples-samples:0);
+/*
+    int skipFramSize = 0;
+    if(skipSamples>samples) {
+        skipFramSize = (skipSamples-samples)>dec_ctx->frame_size?
+                    dec_ctx->frame_size:(skipSamples>samples?skipSamples-samples:0);
+    }
 
     if(skipFramSize>0) {
         AVFrame *input_frame;
-        if (init_input_frame(&input_frame, const_cast<AVCodecContext*>(dec_ctx), dec_ctx->frame_size) < 0) {
+        ret = init_input_frame(&input_frame, const_cast<AVCodecContext*>(dec_ctx), dec_ctx->frame_size);
+        if (ret < 0) {
             av_log(NULL, AV_LOG_ERROR, "init_input_frame failed\n");
-            return AVERROR_EXIT;
+            return ret;
         }
 
-        if (av_audio_fifo_read(sample_fifo, (void **)input_frame->data, skipFramSize) < skipFramSize) {
+        int nb_samples = av_audio_fifo_read(sample_fifo, (void **)input_frame->data, skipFramSize);
+        if (nb_samples < skipFramSize) {
             av_log(NULL, AV_LOG_ERROR, "Could not read data from FIFO\n");
             av_frame_free(&input_frame);
-            return AVERROR_EXIT;
+            return -1;
         }
+        skipped_samples += nb_samples;
         av_frame_free(&input_frame);
         return 0;
     }
-
-    int ret = 0;
-    while (mergeSamples>0 && av_audio_fifo_size(sample_fifo) >= dec_ctx->frame_size) {
+*/
+    while (av_audio_fifo_size(sample_fifo) >= dec_ctx->frame_size) {
+        if(written_samples>=mergeSamples) {
+            isStopFlag = true;
+            break;
+        }
         int wrote_size = 0;
         int frame_size = FFMIN(av_audio_fifo_size(sample_fifo), dec_ctx->frame_size);
         ret = fifo_write_encoder(frame_size, &wrote_size);
-        mergeSamples -= wrote_size;
         if(ret<0) {
             break;
         }
@@ -331,19 +368,22 @@ int FFmpegAudioMerger::fifo_write_encoder(int frame_size, int *ret_wrote_size)
         frame_size = dec_ctx->frame_size;
 
     AVFrame *input_frame;
-    if (init_input_frame(&input_frame, const_cast<AVCodecContext*>(dec_ctx), dec_ctx->frame_size) < 0) {
+    ret = init_input_frame(&input_frame, const_cast<AVCodecContext*>(dec_ctx), dec_ctx->frame_size);
+    if (ret < 0) {
         av_log(NULL, AV_LOG_ERROR, "init_output_frame failed\n");
-        return AVERROR_EXIT;
+        return ret;
     }
 
-    if (av_audio_fifo_read(sample_fifo, (void **)input_frame->data, frame_size) < frame_size) {
+    int nb_samples = av_audio_fifo_read(sample_fifo, (void **)input_frame->data, frame_size);
+    if (nb_samples < frame_size) {
         av_log(NULL, AV_LOG_ERROR, "Could not read data from FIFO\n");
         av_frame_free(&input_frame);
-        return AVERROR_EXIT;
+        return -1;
     }
 
     ret = mRecoder.addData(input_frame, nullptr);
     if(ret>=0 && ret_wrote_size) {
+        written_samples += nb_samples;
         *ret_wrote_size = frame_size;
     }
     av_frame_free(&input_frame);

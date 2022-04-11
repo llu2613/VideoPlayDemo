@@ -83,7 +83,7 @@ void SdlAudioDevice::close()
 }
 
 void SdlAudioDevice::addData(int index, Uint8* buf, int len,
-                             double timestamp)
+                             unsigned long timestamp)
 {
     SampleBuffer *buffer = new SampleBuffer();
     if(!buffer->copy(buf, len)) {
@@ -94,6 +94,7 @@ void SdlAudioDevice::addData(int index, Uint8* buf, int len,
     buffer->channels = mDesiredSpec.channels;
     buffer->timestamp = timestamp;
     buffer->sampleBytes = sampleBytes(mDesiredSpec.format);
+    buffer->samples = buffer->len()/buffer->channels/buffer->sampleBytes;
 
     LockedMapLocker lk(mDataMap.mutex());
 
@@ -101,22 +102,7 @@ void SdlAudioDevice::addData(int index, Uint8* buf, int len,
         SdlAudioDevBuf &devBuf = *(mDataMap.at(index));
         devBuf.enqueue(buffer);
 
-        int discard = 0;
-        mLimitMemoryMutex.lock();
-        for(int i=0; i<10&&devBuf.size()>1; i++) {
-            if(devBuf.memory()<mLimitMemory) {
-                break;
-            }
-            SampleBuffer *b = devBuf.dequeue();
-            if(b) {
-                delete b;
-                discard++;
-            }
-        }
-        mLimitMemoryMutex.unlock();
-        if(discard)
-            WARNING("AudioCard buffer over, discard %d frames, %s index:%d",
-                   discard, name(), index);
+        checkMemory(index);
     } else {
         mDataMap.insert(index, new SdlAudioDevBuf());
         mDataMap[index]->enqueue(buffer);
@@ -151,12 +137,21 @@ void SdlAudioDevice::setMaxMemory(int size)
     mLimitMemory = size;
 }
 
-int SdlAudioDevice::memorySize(int index)
+long SdlAudioDevice::memorySize(int index)
 {
     LockedMapLocker lk(mDataMap.mutex());
 
     if(mDataMap.find(index)!=mDataMap.end())
         return mDataMap.at(index)->memory();
+    return 0;
+}
+
+long SdlAudioDevice::sampleSize(int index)
+{
+    LockedMapLocker lk(mDataMap.mutex());
+
+    if(mDataMap.find(index)!=mDataMap.end())
+        return mDataMap.at(index)->samples();
     return 0;
 }
 
@@ -269,6 +264,33 @@ void SdlAudioDevice::print_status()
     case SDL_AUDIO_PLAYING: printf("Current Audio Status:playing\n"); break;
     case SDL_AUDIO_PAUSED: printf("Current Audio Status:paused\n"); break;
     default: printf("Current Audio Status:???"); break;
+    }
+}
+
+void SdlAudioDevice::checkMemory(int index)
+{
+    LockedMapLocker lk(mDataMap.mutex());
+
+    if(mDataMap.contains(index)) {
+        SdlAudioDevBuf &devBuf = *(mDataMap.at(index));
+
+        int discard = 0;
+        mLimitMemoryMutex.lock();
+        for(int i=0; i<10&&devBuf.size()>1; i++) {
+            if(devBuf.memory()<mLimitMemory) {
+                break;
+            }
+            SampleBuffer *b = devBuf.dequeue();
+            if(b) {
+                delete b;
+                discard++;
+            }
+        }
+        //INFO("AudioCard buffer Memory %ld Samples %ld", devBuf.memory(), devBuf.samples());
+        mLimitMemoryMutex.unlock();
+        if(discard)
+            WARNING("AudioCard buffer over, discard %d frames, %s index:%d",
+                   discard, name(), index);
     }
 }
 

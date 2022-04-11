@@ -49,7 +49,7 @@ public:
     int openCard(std::string name, SDL_AudioSpec wanted, int maxMemory);
     void pauseCard(int cardId, int ispause);
     void closeCard(int cardId);
-    void addData(int cardId, int sourceId, Uint8 *buf, int bufLen, double timestamp);
+    void addData(int cardId, int sourceId, Uint8 *buf, int bufLen, unsigned long timestamp);
     int volume(int cardId);
     void setVolume(int cardId, int volume);
     void clearCardData(int cardId);

@@ -9,7 +9,7 @@
 #define VIDEO_W 1280
 #define VIDEO_H 720
 
-#define CardId 0
+#define CardId 1
 
 VideoWidget::VideoWidget(QWidget *parent)
     : QDialog(parent), videoBuffer("VideoWidget")
@@ -176,7 +176,7 @@ void VideoWidget::onAudioData(std::shared_ptr<MediaData> mediaData)
 {
     if(mediaData->sample_format==AV_SAMPLE_FMT_S16) {
         smtAudioPlayer->addData(CardId, mSourceId, mediaData.get());
-        smtAudioPlayer->setSourceOpen(mSourceId, true);
+        smtAudioPlayer->setSoundOpen(mSourceId, true);
     } else {
         qDebug()<<"Unsupported audio format:"<<mediaData->sample_format;
     }

@@ -66,13 +66,13 @@ public:
     void _setStatus(Status status);
     void _printError(int code, const char* message);
 
-protected:
     const AVFormatContext* formatContext();
     const AVCodecContext* audioCodecContext();
     const AVCodecContext* videoCodecContext();
     const AVStream* audioStream();
     const AVStream* videoStream();
 
+protected:
     virtual void printError(int code, const char* message);
 
     virtual int audioRawFrame(AVCodecContext *pCodecCtx, AVFrame *frame, AVPacket *packet);
@@ -96,6 +96,7 @@ private:
     int audio_stream_idx, video_stream_idx;
 
     long audioFrameCnt, videoFrameCnt;
+    unsigned long audio_pts, video_pts;
 
     FFmpegMediaScaler scaler;
 

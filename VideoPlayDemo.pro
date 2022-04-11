@@ -89,7 +89,8 @@ SOURCES += \
     decoder/FFAvioContext.cpp \
     driver/MediaDecoder.cpp \
     common/RepeatableThread.cpp \
-    common/ring_buffer.c
+    common/ring_buffer.c \
+    webstreamdialog.cpp
 
 HEADERS += \
     common/yuv_pcm_file.h \
@@ -132,10 +133,12 @@ HEADERS += \
     common/ByteLoopBuffer.h \
     common/RepeatableThread.h \
     common/ring_buffer.h \
-    common/ffmpeg_commons.h
+    common/ffmpeg_commons.h \
+    webstreamdialog.h
 
 FORMS += \
-        mainwindow.ui
+        mainwindow.ui \
+        webstreamdialog.ui
 
 RESOURCES += \
     res.qrc

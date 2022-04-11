@@ -14,6 +14,7 @@ public:
         //
         timestamp = 0;
         channels = 0;
+        samples = 0;
         sampleBytes = 0;
     }
 
@@ -69,8 +70,9 @@ public:
 
 public:
     //音频相关
-    double timestamp;
+    unsigned long timestamp;
     int channels;
+    int samples;
     int sampleBytes;
 
 private:

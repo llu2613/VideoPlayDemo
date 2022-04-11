@@ -58,19 +58,19 @@ void StreamMediaDecoder::onDecodeError(int code, std::string msg)
 
 void StreamMediaDecoder::onAudioDataReady(std::shared_ptr<MediaData> data)
 {
-    audio_ts = data->pts*data->time_base_d;
-    if(audio_ts>video_ts) {
-        syncer->setDecodingTs(audio_ts);
-    }
+    audio_ts = data->pts;
+    audio_base_time = data->time_base_d;
+    syncer->setAudioDecodingTs(data->pts);
+
     emit audioData(data);
 }
 
 void StreamMediaDecoder::onVideoDataReady(std::shared_ptr<MediaData> data)
 {
-    video_ts = data->pts*data->time_base_d;
-    if(audio_ts<video_ts) {
-        syncer->setDecodingTs(video_ts);
-    }
+    video_ts = data->pts;
+    video_base_time = data->time_base_d;
+    syncer->setVideoDecodingTs(data->pts);
+
     emit videoData(data);
 }
 
@@ -92,11 +92,15 @@ void StreamMediaDecoder::run()
 
     audio_ts = 0;
     video_ts = 0;
+    audio_base_time = 0;
+    video_base_time = 0;
     syncer->reset();
 
     AVDictionary* options = NULL;
 //    av_dict_set(&options, "rtsp_transport", "tcp", 0);
     retCode = mediaDecoder.open(url, options, mIsHwaccels);
+    bool haveVideo = mediaDecoder.videoStream()?true:false;
+    bool haveAudio = mediaDecoder.audioStream()?true:false;
 
     bool isDecoding = true;
     for (int loopCnt=0;isDecoding;) {
@@ -118,16 +122,16 @@ void StreamMediaDecoder::run()
             break;
         }
 
-        for(int i=0; isDecoding&&i<20; i++) {
+        for(int i=0; isDecoding&&i<100; i++) {
             //退出标记
             mStopMutex.lock();
             if(mStopFlag)
                 isDecoding = false;
             mStopMutex.unlock();
 
-            if(syncer->getAudioDecodeDelay()>1
-                    ||syncer->getVideoDecodeDelay()>1) {
-                    QThread::msleep(100);
+            if((haveAudio && syncer->getAudioDelayTs()*audio_base_time>2)
+                    ||(haveVideo && syncer->getVideoDelayTs()*video_base_time>2)) {
+                QThread::msleep(10);
             } else {
                 break;
             }

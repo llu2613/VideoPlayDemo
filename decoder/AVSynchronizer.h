@@ -11,18 +11,24 @@ public:
     ~AVSynchronizer();
 
     void reset();
-    void setDecodingTs(double time);
-    void setAudioPlayingTs(int64_t pts, double time_base);
-    void setAudioPlayingTs(double time);
-    void setVideoPlayingTs(int64_t pts, double time_base);
-    void setVideoPlayingTs(double time);
-    double getAudioDecodeDelay();
-    double getVideoDecodeDelay();
-    double getAudioVideoDelay();
+
+    void setAudioDecodingTs(unsigned long ts);
+    void setVideoDecodingTs(unsigned long ts);
+    void setAudioPlayingTs(unsigned long ts);
+    void setVideoPlayingTs(unsigned long ts);
+
+    unsigned long audioDecodingTs();
+    unsigned long videoDecodingTs();
+    unsigned long audioPlayingTs();
+    unsigned long videoPlayingTs();
+
+    unsigned long getAudioDelayTs();
+    unsigned long getVideoDelayTs();
 
 private:
     std::mutex mMutex;
-    double audio_timestamp, video_timestamp, decode_timestamp;
+    unsigned long audio_play_ts, video_play_ts;
+    unsigned long audio_decode_ts, video_decode_ts;
 
 };
 

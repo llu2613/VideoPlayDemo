@@ -641,7 +641,7 @@ int FFmpegFileEncoder::encode_write_frame(AVFrame *filt_frame, unsigned int stre
         ret = avcodec_send_frame(stream_ctx[stream_index].enc_ctx, filt_frame);
         if (ret < 0) {
             av_log(NULL, AV_LOG_ERROR, "Error submitting the frame to the encoder, %s\n", wrap_av_err2str(ret));
-            return ret;
+            //return ret;
         }
 
 		while (1) {
@@ -683,7 +683,7 @@ int FFmpegFileEncoder::encode_write_frame(AVFrame *filt_frame, unsigned int stre
         if(ret != 0) {
             av_log(NULL, AV_LOG_ERROR, "#%d enc avcodec_send_packet %s",
                    stream_index, wrap_av_err2str(ret));
-            return ret;
+            //return ret;
         }
         while (1) {
             ret = avcodec_receive_packet(stream_ctx[stream_index].enc_ctx, &enc_pkt);

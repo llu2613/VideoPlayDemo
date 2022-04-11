@@ -17,6 +17,7 @@ class SdlAudioDevBuf
 public:
     SdlAudioDevBuf() {
         mMemory = 0;
+        mSamples = 0;
     }
     ~SdlAudioDevBuf() {
         clear();
@@ -24,6 +25,7 @@ public:
     void enqueue(SampleBuffer *buffer) {
         mList.push_back(buffer);
         mMemory += buffer->len();
+        mSamples += buffer->samples;
     }
     SampleBuffer* front() {
         if(mList.size()) {
@@ -35,8 +37,10 @@ public:
         if(mList.size()) {
             SampleBuffer* b = mList.front();
             mList.pop_front();
-            if(b)
+            if(b) {
                 mMemory -= b->len();
+                mSamples -= b->samples;
+            }
             return b;
         }
         return nullptr;
@@ -51,13 +55,17 @@ public:
     int size() {
         return mList.size();
     }
-    int memory() {
+    long memory() {
         return mMemory;
+    }
+    long samples() {
+        return mSamples;
     }
 private:
     std::mutex mMutex;
     std::list<SampleBuffer*> mList;
-    int mMemory;
+    long mMemory;
+    long mSamples;
 };
 
 class SdlAudioDevice
@@ -83,7 +91,7 @@ public:
 
     void close();
 
-    void addData(int index, Uint8* buf, int len, double timestamp=0);
+    void addData(int index, Uint8* buf, int len, unsigned long timestamp=0);
 
     int mixVolume();
     void setMixVolume(int volume);
@@ -91,7 +99,8 @@ public:
     std::list<int> indexs();
 
     void setMaxMemory(int size);
-    int memorySize(int index);
+    long memorySize(int index);
+    long sampleSize(int index);
     int bufferSize(int index);
 
     int takeIndex(int index, Uint8 *stream, int len);
@@ -120,6 +129,7 @@ private:
     int mLimitMemory;
 
     int sampleBytes(int fmt);
+    void checkMemory(int index);
 };
 
 #endif // SDLAUDIODEVICE_H
