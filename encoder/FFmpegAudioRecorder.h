@@ -1,6 +1,7 @@
 ﻿#ifndef FFMPEGAUDIORECORDER_H
 #define FFMPEGAUDIORECORDER_H
 
+#include <mutex>
 #include "common/ffmpeg_commons.h"
 
 extern "C" {
@@ -9,6 +10,12 @@ extern "C" {
 #include "libswresample/swresample.h"
 #include "libavutil/audio_fifo.h"
 }
+
+class FFmpegAudioRecorderCallback
+{
+public:
+    virtual void onRecordError(int level, const char* msg)=0;
+};
 
 class FFmpegAudioRecorder
 {
@@ -22,22 +29,24 @@ public:
              int src_sample_rate);
 
     int open(const char *output,
-             int64_t  src_ch_layout,
-             enum AVSampleFormat src_sample_fmt,
-             int src_sample_rate,
-             int64_t  out_ch_layout,
-             enum AVSampleFormat out_sample_fmt,
-             int out_sample_rate);
+             int64_t  src_ch_layout, enum AVSampleFormat src_sample_fmt, int src_sample_rate,
+             int64_t  out_ch_layout, enum AVSampleFormat out_sample_fmt, int out_sample_rate);
+
+    int open(const char *output, const char *format_name, enum AVCodecID codec_id,
+             int64_t  src_ch_layout, enum AVSampleFormat src_sample_fmt, int src_sample_rate,
+             int64_t  out_ch_layout, enum AVSampleFormat out_sample_fmt, int out_sample_rate);
 
     int addData(AVFrame *frame, AVPacket *packet);
 
     void close();
 
+    void setCallback(FFmpegAudioRecorderCallback* callback);
+
     void setLogLevel(int level);
     bool isReady();
 
 protected:
-    virtual void print_errmsg(int code, const char* msg);
+    virtual void print_errmsg(int level, const char* msg);
 
 private:
     int init_output_frame(AVFrame **frame,
@@ -52,6 +61,9 @@ private:
     void av_log(void *avcl, int level, const char *fmt, ...);
     void dump_codec(AVCodec* codec);
     void statistics();
+
+    std::mutex mCallbackMutex;
+    FFmpegAudioRecorderCallback *mCallback;
 
     AVFormatContext *ofmt_ctx;
     AVStream *out_stream;

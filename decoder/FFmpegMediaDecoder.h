@@ -15,6 +15,7 @@ extern "C" {
 //工具
 #include "libavutil/error.h"
 #include "libavutil/time.h"
+#include "libavutil/timestamp.h"
 }
 
 class FFmpegMediaDecoderCallback

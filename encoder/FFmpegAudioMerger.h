@@ -15,9 +15,9 @@ public:
 
     void start(std::string out_file);
     void start(std::string out_file,
-               int out_nb_channels,
-               enum AVSampleFormat out_sample_fmt,
-               int out_sample_rate);
+               int out_nb_channels, enum AVSampleFormat out_sample_fmt, int out_sample_rate);
+    void start(std::string out_file, std::string format_name, enum AVCodecID codec_id,
+               int out_nb_channels, enum AVSampleFormat out_sample_fmt, int out_sample_rate);
 
     void setLogLevel(int level);
     void setCallback(FFMergerCallback *callback);
@@ -53,9 +53,11 @@ private:
     std::mutex m_mutex;
     std::string out_file;
     int out_nb_channels;
+    std::string out_format_name;
+    enum AVCodecID out_codec_id;
     enum AVSampleFormat out_sample_fmt;
     int out_sample_rate;
-    std::atomic_bool isStopFlag;
+    std::atomic<bool> isStopFlag;
     int64_t skipSamples;
     int64_t mergeSamples;
 

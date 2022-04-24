@@ -26,6 +26,26 @@ static int interrupt_callback(void *pCtx)
     return 0;
 }
 
+static char* _av_ts2str(int64_t ts) {
+    char av_error[AV_TS_MAX_STRING_SIZE] = {0};
+    return av_ts_make_string(av_error, ts);
+}
+static char* _av_ts2timestr(int64_t ts, AVRational *tb) {
+    char av_error[AV_TS_MAX_STRING_SIZE] = {0};
+    return av_ts_make_time_string(av_error, ts, tb);
+}
+
+static void log_packet(const AVFormatContext *fmt_ctx, const AVPacket *pkt)
+{
+    AVRational *time_base = &fmt_ctx->streams[pkt->stream_index]->time_base;
+
+    printf("pts:%s pts_time:%s dts:%s dts_time:%s duration:%s duration_time:%s stream_index:%d\n",
+           _av_ts2str(pkt->pts), _av_ts2timestr(pkt->pts, time_base),
+           _av_ts2str(pkt->dts), _av_ts2timestr(pkt->dts, time_base),
+           _av_ts2str(pkt->duration), _av_ts2timestr(pkt->duration, time_base),
+           pkt->stream_index);
+}
+
 FFmpegMediaDecoder::FFmpegMediaDecoder()
 {
     pFormatCtx = nullptr;
@@ -890,10 +910,11 @@ void FFmpegMediaDecoder::_printError(int code, const char* message)
 
 void FFmpegMediaDecoder::printError(int code, const char* message)
 {
-    qDebug()<<"Decoder printError"<<QString::fromLocal8Bit(message);
     mCallbackMutex.lock();
     if(mCallback)
         mCallback->onDecodeError(code, message);
+    else
+        qDebug()<<"Decoder printError"<<QString::fromLocal8Bit(message);
     mCallbackMutex.unlock();
 }
 

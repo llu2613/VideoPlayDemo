@@ -77,6 +77,8 @@ FFmpegAudioRecorder::FFmpegAudioRecorder()
 
     enc_samples = 0;
     log_level = AV_LOG_INFO;
+
+    mCallback = nullptr;
 }
 
 FFmpegAudioRecorder::~FFmpegAudioRecorder()
@@ -144,25 +146,9 @@ int FFmpegAudioRecorder::open(const char *output,
 }
 
 int FFmpegAudioRecorder::open(const char *output,
-                              int64_t  src_ch_layout,
-                              enum AVSampleFormat src_sample_fmt,
-                              int src_sample_rate,
-                              int64_t  out_ch_layout,
-                              enum AVSampleFormat out_sample_fmt,
-                              int out_sample_rate)
+                              int64_t  src_ch_layout, enum AVSampleFormat src_sample_fmt, int src_sample_rate,
+                              int64_t  out_ch_layout, enum AVSampleFormat out_sample_fmt, int out_sample_rate)
 {
-    int ret = 0;
-
-    if(ofmt_ctx) {
-        av_log(NULL,AV_LOG_ERROR, "ofmt_ctx has been inited, please close first!\n");
-        return 0;
-    }
-
-    av_log(NULL,AV_LOG_INFO, "recorder open:%s src: chly:%d fmt:%d rate:%d out: chly:%d fmt:%d rate:%d\n",
-           output, src_ch_layout, src_sample_fmt, src_sample_rate,
-           out_ch_layout, out_sample_fmt, out_sample_rate);
-    enc_samples = 0;
-
     AVOutputFormat *oformat = av_guess_format(NULL,output, NULL);
     if (oformat==NULL){
         av_log(NULL,AV_LOG_ERROR,"fail to find the output format\n");
@@ -173,7 +159,30 @@ int FFmpegAudioRecorder::open(const char *output,
            oformat->name?oformat->name:"", oformat->long_name?oformat->long_name:"",
            oformat->mime_type?oformat->mime_type:"", oformat->extensions?oformat->extensions:"");
 
-    AVCodec *pCodec = avcodec_find_encoder(oformat->audio_codec);
+    return open(output, oformat->name, oformat->audio_codec,
+                src_ch_layout, src_sample_fmt, src_sample_rate,
+                out_ch_layout, out_sample_fmt, out_sample_rate);
+}
+
+int FFmpegAudioRecorder::open(const char *output, const char *format_name, enum AVCodecID codec_id,
+                              int64_t  src_ch_layout, enum AVSampleFormat src_sample_fmt, int src_sample_rate,
+                              int64_t  out_ch_layout, enum AVSampleFormat out_sample_fmt, int out_sample_rate)
+{
+    int ret = 0;
+
+    if(ofmt_ctx) {
+        av_log(NULL,AV_LOG_ERROR, "ofmt_ctx has been inited, please close first!\n");
+        return 0;
+    }
+
+    av_log(NULL,AV_LOG_INFO, "recorder open:%s src: chly:%d fmt:%d rate:%d "
+                             "out: format_name:%s, codec_id:%d(%s), chly:%d fmt:%d rate:%d\n",
+           output, src_ch_layout, src_sample_fmt, src_sample_rate,
+           format_name!=NULL?format_name:"", codec_id, avcodec_get_name(codec_id),
+           out_ch_layout, out_sample_fmt, out_sample_rate);
+    enc_samples = 0;
+
+    AVCodec *pCodec = avcodec_find_encoder(codec_id);
     if (pCodec == NULL){
         av_log(NULL,AV_LOG_ERROR,"fail to find codec\n");
         return -1;
@@ -211,7 +220,7 @@ int FFmpegAudioRecorder::open(const char *output,
 
     ofmt_ctx = avformat_alloc_context();
 
-    if (avformat_alloc_output_context2(&ofmt_ctx,oformat,oformat->name,output) <0){
+    if (avformat_alloc_output_context2(&ofmt_ctx,NULL,format_name,output) <0){
         av_log(NULL,AV_LOG_ERROR,"fail to alloc output context\n");
         return -1;
     }
@@ -463,7 +472,7 @@ int FFmpegAudioRecorder::encode_write_frame(AVFrame *filt_frame, int stream_inde
             enc_ctx->time_base,
             ofmt_ctx->streams[stream_index]->time_base);
         /* write encoded frame */
-        ret = av_write_frame(ofmt_ctx, &enc_pkt);
+        ret = av_interleaved_write_frame(ofmt_ctx, &enc_pkt);
         write_pts += enc_pkt.duration;
         av_packet_unref(&enc_pkt);
         if (ret < 0) {
@@ -583,12 +592,23 @@ void FFmpegAudioRecorder::av_log(void *avcl, int level, const char *fmt, ...)
     va_end(args);
 
     if(level<=log_level)
-        print_errmsg(-1, sprint_buf);
+        print_errmsg(level, sprint_buf);
 }
 
-void FFmpegAudioRecorder::print_errmsg(int code, const char *msg)
+void FFmpegAudioRecorder::print_errmsg(int level, const char *msg)
 {
-    printf("debug:[%s]%s", "FFmpegAudioRecorder", msg);
+    mCallbackMutex.lock();
+    if(mCallback)
+        mCallback->onRecordError(level, msg);
+    else
+        printf("debug:[%s]%s", "FFmpegAudioRecorder", msg);
+    mCallbackMutex.unlock();
+}
+
+void FFmpegAudioRecorder::setCallback(FFmpegAudioRecorderCallback* callback)
+{
+    std::lock_guard<std::mutex> lk(mCallbackMutex);
+    mCallback = callback;
 }
 
 void FFmpegAudioRecorder::setLogLevel(int level)

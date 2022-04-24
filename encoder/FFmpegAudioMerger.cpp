@@ -27,6 +27,7 @@ FFmpegAudioMerger::FFmpegAudioMerger()
     skipped_samples = 0;
     written_samples = 0;
 
+    out_codec_id = AV_CODEC_ID_NONE;
     out_nb_channels = FF_INVALID;
     out_sample_fmt = AV_SAMPLE_FMT_NONE;
     out_sample_rate = FF_INVALID;
@@ -63,7 +64,16 @@ void FFmpegAudioMerger::start(std::string out_file,
                               enum AVSampleFormat out_sample_fmt,
                               int out_sample_rate)
 {
+    start(out_file, "", AV_CODEC_ID_NONE,
+          out_nb_channels, out_sample_fmt, out_sample_rate);
+}
+
+void FFmpegAudioMerger::start(std::string out_file, std::string format_name, enum AVCodecID codec_id,
+                              int out_nb_channels, enum AVSampleFormat out_sample_fmt, int out_sample_rate)
+{
     this->out_file = out_file;
+    this->out_format_name = format_name;
+    this->out_codec_id = codec_id;
     this->out_nb_channels = out_nb_channels;
     this->out_sample_fmt = out_sample_fmt;
     this->out_sample_rate = out_sample_rate;
@@ -137,7 +147,7 @@ int FFmpegAudioMerger::merge(std::string in_file, int skipSec, int totalSec)
 void FFmpegAudioMerger::merge_statistics()
 {
     char text[4096];
-    sprintf(text, "merge:{ samples:%d, skipped_samples:%d, written_samples:%d }\n",
+    sprintf(text, "merge_statistics:{ samples:%d, skipped_samples:%d, written_samples:%d }\n",
             samples, skipped_samples, written_samples);
 
     av_log(NULL, AV_LOG_INFO, text);
@@ -233,8 +243,9 @@ int FFmpegAudioMerger::openOutput()
 //    ret = mRecoder.open(output_filename, in_codec_ctx->channel_layout,
 //                  in_codec_ctx->sample_fmt, in_codec_ctx->sample_rate);
 
-    ret = mRecoder.open(output_filename, in_codec_ctx->channel_layout,
-                        in_codec_ctx->sample_fmt, in_codec_ctx->sample_rate,
+    ret = mRecoder.open(output_filename, out_format_name.size()?out_format_name.data():NULL,
+                        out_codec_id!=AV_CODEC_ID_NONE?out_codec_id:in_codec_ctx->codec_id,
+                        in_codec_ctx->channel_layout, in_codec_ctx->sample_fmt, in_codec_ctx->sample_rate,
                         out_nb_channels>0?av_get_default_channel_layout(out_nb_channels):in_codec_ctx->channel_layout,
                         out_sample_fmt!=AV_SAMPLE_FMT_NONE?out_sample_fmt:in_codec_ctx->sample_fmt,
                         out_sample_rate>0?out_sample_rate:in_codec_ctx->sample_rate);
