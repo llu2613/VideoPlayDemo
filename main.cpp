@@ -30,6 +30,7 @@ class FFAudioMerger : public FFmpegAudioMerger, private FFMergerCallback
 public:
     FFAudioMerger() {
         setCallback(this);
+        setLogLevel(AV_LOG_INFO);
     }
     void onMergerProgress(long current, long total) {
         int ratio = (int)(100*current/total);
@@ -89,20 +90,20 @@ int main(int argc, char *argv[])
 {
 //    M3u8Parsing parsing;
 //    parsing.test();
-
+/*
     FFAudioMerger merger;
-    std::string outfile = "D:/test/1hour_test0_.mp3";
+    std::string outfile = "D:/test/pcm/wwwwwwwwwwww.wav";
     std::string out_fmt = "";
     enum AVCodecID out_codec;
     _ffmpeg_codec(outfile, &out_fmt, &out_codec);
     printf("==_ffmpeg_codec==%s %d\n", out_fmt.data(), out_codec);
     merger.start(outfile, out_fmt, out_codec,//AV_CODEC_ID_AAC,AV_CODEC_ID_MP3
                  0, AV_SAMPLE_FMT_NONE, 32000);
-    merger.merge("http://192.168.1.64:9080/m3u8file/DD79CDE0-21A6-4251-AE28-65A8096D574E1359.m3u8", 0, 0);
-//    merger.merge("D:\\test\\devrecorda02c237ee64441e5b90f5e6c7ab616cf2\\E7519A80-8BB2-4955-BBD4-D0F1DFD26CD81285.m3u8",
-//                 40, 60*60);
+//    merger.merge("http://192.168.1.64:9080/m3u8file/AFED897F-3CFE-4106-B078-C87D36B4A65B1433.m3u8", 0, 0);
+    merger.merge("D:\\test\\pcm\\20220418145503958-1-1-0A0A4783-8A63-428D-B15F-8518D0CF752D-1483434575.ts",
+                 0, 0);
     merger.finish();
-
+*/
 //    useOpenGLMode(2);
 
     QApplication a(argc, argv);

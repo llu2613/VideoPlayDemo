@@ -8,6 +8,7 @@ class SdlEventDispatcher : public QThread
     Q_OBJECT
 public:
     explicit SdlEventDispatcher(QObject *parent = nullptr);
+    ~SdlEventDispatcher();
 
 protected:
     void run();
@@ -18,13 +19,13 @@ private:
     const char* devtypestr(int iscapture);
 
 private:
-    void eventAudioDeviceAdded(const char *name);
-    void eventAudioDeviceRemoved(uint32_t devid);
+    void eventAudioDeviceAdded(int index, int iscapture);
+    void eventAudioDeviceRemoved(int devid);
 
 
 signals:
-    void audioDeviceAdded(QString name);
-    void audioDeviceRemoved(uint32_t devid);
+    void audioDeviceAdded(int index, int iscapture);
+    void audioDeviceRemoved(int devid);
 
 public slots:
 };

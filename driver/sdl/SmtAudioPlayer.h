@@ -67,8 +67,8 @@ signals:
     void audioCardClosed(QString name, int cardId);
 
 public slots:
-    void eventAudioDeviceAdded(QString name);
-    void eventAudioDeviceRemoved(uint32_t devid);
+    void eventAudioDeviceAdded(int index, int iscapture);
+    void eventAudioDeviceRemoved(int devid);
 };
 
 #endif // SMTAUDIOPLAYER_H

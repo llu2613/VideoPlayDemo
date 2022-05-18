@@ -59,7 +59,7 @@ void StreamMediaDecoder::onDecodeError(int code, std::string msg)
 void StreamMediaDecoder::onAudioDataReady(std::shared_ptr<MediaData> data)
 {
     audio_ts = data->pts;
-    audio_base_time = data->time_base_d;
+    syncer->setAudioTimeBaseD(data->time_base_d);
     syncer->setAudioDecodingTs(data->pts);
 
     emit audioData(data);
@@ -68,7 +68,7 @@ void StreamMediaDecoder::onAudioDataReady(std::shared_ptr<MediaData> data)
 void StreamMediaDecoder::onVideoDataReady(std::shared_ptr<MediaData> data)
 {
     video_ts = data->pts;
-    video_base_time = data->time_base_d;
+    syncer->setVideoTimeBaseD(data->time_base_d);
     syncer->setVideoDecodingTs(data->pts);
 
     emit videoData(data);
@@ -92,8 +92,6 @@ void StreamMediaDecoder::run()
 
     audio_ts = 0;
     video_ts = 0;
-    audio_base_time = 0;
-    video_base_time = 0;
     syncer->reset();
 
     AVDictionary* options = NULL;
@@ -129,8 +127,8 @@ void StreamMediaDecoder::run()
                 isDecoding = false;
             mStopMutex.unlock();
 
-            if((haveAudio && syncer->getAudioDelayTs()*audio_base_time>2)
-                    ||(haveVideo && syncer->getVideoDelayTs()*video_base_time>2)) {
+            if((haveAudio && syncer->getAudioDelaySec()>1)
+                    ||(haveVideo && syncer->getVideoDelaySec()>1)) {
                 QThread::msleep(10);
             } else {
                 break;

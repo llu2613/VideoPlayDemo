@@ -43,7 +43,6 @@ private:
     bool mStopFlag;
     AVSynchronizer *syncer;
     unsigned long audio_ts, video_ts;
-    double audio_base_time, video_base_time;
 
     QString mInputUrl;
     bool mIsHwaccels;

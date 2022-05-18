@@ -14,6 +14,28 @@ SmtAudioPlayer* SmtAudioPlayer::inst()
     return m_instance;
 }
 
+static void SdlLogOutputFunction(void *userdata, int category, SDL_LogPriority priority, const char *message)
+{
+    const static char prio[][32] = {"NONE", "VERBOSE", "DEBUG", "INFO", "WARN", "ERROR", "CRITICAL"};
+    const static char cate[][32] = {"APPLICATION", "ERROR", "ASSERT", "SYSTEM", "AUDIO", "VIDEO", "RENDER", "INPUT", "TEST"};
+
+    SmtAudioPlayer *pThis = userdata? (SmtAudioPlayer*)userdata: NULL;
+    if(pThis) {
+        char cate_s[32], prio_s[32];
+        if(category>=0 && category<(sizeof(cate)/32))
+            strcpy(cate_s, cate[category]);
+        else
+            sprintf(cate_s, "%d", category);
+
+        if(priority>=0 && priority<(sizeof(prio)/32))
+            strcpy(prio_s, prio[priority]);
+        else
+            sprintf(prio_s, "%d", priority);
+
+        qDebug()<<QString("SdlLog: %1 %2 %3").arg(cate_s).arg(prio_s).arg(message);
+    }
+}
+
 SmtAudioPlayer::SmtAudioPlayer(QObject *parent)
     : QObject(parent)
 {
@@ -30,7 +52,6 @@ SmtAudioPlayer::SmtAudioPlayer(QObject *parent)
             this, &SmtAudioPlayer::eventAudioDeviceAdded);
     connect(&mSdlEventDispatcher, &SdlEventDispatcher::audioDeviceRemoved,
             this, &SmtAudioPlayer::eventAudioDeviceRemoved);
-    //mSdlEventDispatcher.start();
 }
 
 SmtAudioPlayer::~SmtAudioPlayer()
@@ -42,11 +63,13 @@ SmtAudioPlayer::~SmtAudioPlayer()
 
 void SmtAudioPlayer::initialize()
 {
+    SDL_LogSetOutputFunction(SdlLogOutputFunction, this);
+    SDL_LogSetAllPriority(SDL_LOG_PRIORITY_INFO);
+
     if(!mSdlEventDispatcher.isRunning()) {
         qDebug()<<"AudioSpec:"<<"freq"<<mAudioSpec.freq
                    <<"channels"<<mAudioSpec.channels<<"silence"<<mAudioSpec.silence
                   <<"samples"<<mAudioSpec.samples<<"format"<<mAudioSpec.format;
-
         mSdlEventDispatcher.start();
     }
 }
@@ -161,18 +184,29 @@ void SmtAudioPlayer::clearData(int cardId, int sourceId)
     SdlAudioPlayer::clearData(cardId, sourceId);
 }
 
-void SmtAudioPlayer::eventAudioDeviceAdded(QString name)
+void SmtAudioPlayer::eventAudioDeviceAdded(int index, int iscapture)
 {
-    qDebug()<<"eventAddCard, name:"<<name;
+    qDebug()<<"eventAddCard, index:"<<index<<"iscapture:"<<iscapture;
 
-    int cardId = openCard(name.toStdString(), mAudioSpec, MAX_BUF_MEM_SIZE);
+    const char *name = SDL_GetAudioDeviceName(index, iscapture);
+    if(name==NULL) {
+        qDebug()<<"eventAddCard, device name is null!";
+    }
+
+    int oldCardId = getCardId(name);
+    if(oldCardId!=-1) {
+        print_card_info(oldCardId);
+        closeCard(oldCardId);
+    }
+
+    int cardId = openCard(name, mAudioSpec, MAX_BUF_MEM_SIZE);
     if(cardId!=-1) {
         emit audioCardOpened(name, cardId);
         qDebug()<<"eventAddCard, opened:"<<name<<cardId;
     }
 }
 
-void SmtAudioPlayer::eventAudioDeviceRemoved(uint32_t devid)
+void SmtAudioPlayer::eventAudioDeviceRemoved(int devid)
 {
     qDebug()<<"eventMoveCard, ID:"<<devid;
 

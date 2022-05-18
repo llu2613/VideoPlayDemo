@@ -11,6 +11,11 @@ SdlEventDispatcher::SdlEventDispatcher(QObject *parent) : QThread(parent)
 
 }
 
+SdlEventDispatcher::~SdlEventDispatcher()
+{
+    mIsRunning = false;
+}
+
 void SdlEventDispatcher::run()
 {
     mIsRunning = true;
@@ -44,7 +49,7 @@ void SdlEventDispatcher::iteration()
                 continue;
             }
             if (!iscapture) {
-                eventAudioDeviceAdded(name);
+                eventAudioDeviceAdded(index, iscapture);
             }
         } else if (e.type == SDL_AUDIODEVICEREMOVED) {
             dev = (SDL_AudioDeviceID) e.adevice.which;
@@ -54,13 +59,12 @@ void SdlEventDispatcher::iteration()
     }
 }
 
-void SdlEventDispatcher::eventAudioDeviceAdded(const char *name)
+void SdlEventDispatcher::eventAudioDeviceAdded(int index, int iscapture)
 {
-    QString name_s = QString::fromUtf8(name);
-    emit audioDeviceAdded(name_s);
+    emit audioDeviceAdded(index, iscapture);
 }
 
-void SdlEventDispatcher::eventAudioDeviceRemoved(uint32_t devid)
+void SdlEventDispatcher::eventAudioDeviceRemoved(int devid)
 {
     emit audioDeviceRemoved(devid);
 }

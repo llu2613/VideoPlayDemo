@@ -243,12 +243,14 @@ int FFmpegAudioMerger::openOutput()
 //    ret = mRecoder.open(output_filename, in_codec_ctx->channel_layout,
 //                  in_codec_ctx->sample_fmt, in_codec_ctx->sample_rate);
 
-    ret = mRecoder.open(output_filename, out_format_name.size()?out_format_name.data():NULL,
-                        out_codec_id!=AV_CODEC_ID_NONE?out_codec_id:in_codec_ctx->codec_id,
+    int64_t out_ch_lyt = out_nb_channels>0?av_get_default_channel_layout(out_nb_channels):in_codec_ctx->channel_layout;
+    enum AVSampleFormat out_sp_fmt = out_sample_fmt!=AV_SAMPLE_FMT_NONE?out_sample_fmt:in_codec_ctx->sample_fmt;
+    int out_sp_rate = out_sample_rate>0?out_sample_rate:in_codec_ctx->sample_rate;
+    ret = mRecoder.open(output_filename,
+                        out_format_name.size()?out_format_name.data():NULL,
+                        out_codec_id,
                         in_codec_ctx->channel_layout, in_codec_ctx->sample_fmt, in_codec_ctx->sample_rate,
-                        out_nb_channels>0?av_get_default_channel_layout(out_nb_channels):in_codec_ctx->channel_layout,
-                        out_sample_fmt!=AV_SAMPLE_FMT_NONE?out_sample_fmt:in_codec_ctx->sample_fmt,
-                        out_sample_rate>0?out_sample_rate:in_codec_ctx->sample_rate);
+                        out_ch_lyt, out_sp_fmt, out_sp_rate);
 
     has_opened = true;
 

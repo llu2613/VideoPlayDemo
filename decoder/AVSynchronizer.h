@@ -11,6 +11,8 @@ public:
     ~AVSynchronizer();
 
     void reset();
+    void setAudioTimeBaseD(double time_base_d);
+    void setVideoTimeBaseD(double time_base_d);
 
     void setAudioDecodingTs(unsigned long ts);
     void setVideoDecodingTs(unsigned long ts);
@@ -25,10 +27,14 @@ public:
     unsigned long getAudioDelayTs();
     unsigned long getVideoDelayTs();
 
+    double getAudioDelaySec();
+    double getVideoDelaySec();
+
 private:
-    std::mutex mMutex;
+    std::recursive_mutex mMutex;
     unsigned long audio_play_ts, video_play_ts;
     unsigned long audio_decode_ts, video_decode_ts;
+    double audio_time_base_d, video_time_base_d;
 
 };
 

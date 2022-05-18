@@ -1,9 +1,7 @@
 ﻿#include "SdlAudioPlayer.h"
 #include <string.h>
-#include <QDebug>
 
-#define INFO(fmt,...) qDebug(fmt, ##__VA_ARGS__)
-//#define INFO(fmt,...) SDL_LogInfo(SDL_LOG_CATEGORY_AUDIO, fmt, ##__VA_ARGS__)
+#define INFO(fmt,...) SDL_LogInfo(SDL_LOG_CATEGORY_AUDIO, fmt, ##__VA_ARGS__)
 #define WARNING(fmt,...) SDL_LogWarn(SDL_LOG_CATEGORY_AUDIO, fmt, ##__VA_ARGS__)
 #define ERROR(fmt,...) SDL_LogError(SDL_LOG_CATEGORY_AUDIO, fmt, ##__VA_ARGS__)
 
@@ -90,8 +88,6 @@ bool SdlAudioPlayer::initAudioSystem()
         return false;
     } else{
         mIsInitSys = true;
-        /* Enable standard application logging */
-        SDL_LogSetPriority(SDL_LOG_CATEGORY_APPLICATION, SDL_LOG_PRIORITY_INFO);
         return true;
     }
 }
@@ -221,7 +217,7 @@ void SdlAudioPlayer::clearSourceData(int sourceId)
 }
 
 int SdlAudioPlayer::openCard(
-            std::string name,
+            const char* name,
             int freq,
             SDL_AudioFormat format,
             Uint8 channels,
@@ -238,35 +234,45 @@ int SdlAudioPlayer::openCard(
     return openCard(name, wanted, maxMemory);
 }
 
-int SdlAudioPlayer::openCard(std::string name,
+int SdlAudioPlayer::openCard(const char* name_c,
                              SDL_AudioSpec wanted,
                              int maxMemory)
 {
-    const char* name_c = name.c_str();
     //找卡
     int findIndex = -1;
     int emptyIndex = -1;
     for(int i=0; i<MAX_CARD_NUM; i++) {
-        if(findIndex==-1 && mCardArray[i].device) {
+        if(findIndex==-1) {
             SoundCard &card = mCardArray[i];
             card.mutex.lock();
-            if(!strcmp(card.device->name(), name_c))
-                findIndex = i;
+            if(mCardArray[i].device) {
+                if(!strcmp(card.device->name(), name_c))
+                    findIndex = i;
+            }
             card.mutex.unlock();
         }
-        if(emptyIndex==-1 && !mCardArray[i].device) {
-            emptyIndex = i;
+        if(emptyIndex==-1) {
+            SoundCard &card = mCardArray[i];
+            card.mutex.lock();
+            if(!mCardArray[i].device) {
+                emptyIndex = i;
+            }
+            card.mutex.unlock();
         }
     }
 
     if(findIndex!=-1) {
+        bool isOpened = false;
         SoundCard &card = mCardArray[findIndex];
         card.mutex.lock();
         if(card.device && card.device->isOpened()) {
-            INFO("SoundCard %s had been opened!", name);
-            return findIndex;
+            isOpened = true;
         }
         card.mutex.unlock();
+        if(isOpened) {
+            INFO("SoundCard %s had been opened!", name_c);
+            return findIndex;
+        }
     } else if(emptyIndex!=-1) {
         SoundCard &card = mCardArray[emptyIndex];
         card.mutex.lock();
@@ -286,9 +292,9 @@ int SdlAudioPlayer::openCard(std::string name,
             card.device->close();
             int ret = card.device->open(name_c, wanted)>0;
             card.enable = ret>0;
-            card.name = name;
+            card.name = name_c;
             card.device->setMaxMemory(maxMemory);
-            INFO("openCard: %s, cardId: %d", name, willIndex);
+            INFO("openCard: %s, cardId: %d", name_c, willIndex);
         }
         card.mutex.unlock();
         return willIndex;
@@ -333,6 +339,8 @@ void SdlAudioPlayer::closeCard(int cardId)
         card.device = nullptr;
     }
     card.mutex.unlock();
+
+    INFO("closeCard: cardId: %d", cardId);
 }
 
 int SdlAudioPlayer::bufferSize(int cardId, int sourceId)
@@ -367,24 +375,28 @@ void SdlAudioPlayer::onCardDataPrepared(int cardId, std::map<int, std::shared_pt
 std::list<std::string> SdlAudioPlayer::devices()
 {
     std::list<std::string> list;
-    int n = SDL_GetNumAudioDevices(SDL_FALSE);
-    for(int i=0; i<n; i++) {
-        std::string name = SDL_GetAudioDeviceName(i, SDL_FALSE);
+
+    int count = SDL_GetNumAudioDevices(SDL_FALSE);
+    for(int i=0; i<count; i++) {
+        const char *name = SDL_GetAudioDeviceName(i, SDL_FALSE);
         list.push_back(name);
     }
 
     return list;
 }
 
-int SdlAudioPlayer::getCardId(std::string name)
+int SdlAudioPlayer::getCardId(const char* name)
 {
+    if(name==NULL)
+        return -1;
+
     for(int i=0; i<MAX_CARD_NUM; i++) {
         SoundCard &card = mCardArray[i];
 
         std::lock_guard<std::mutex> lk(card.mutex);
 
         if(card.device
-                && !name.compare(card.device->name())) {
+                && !strcmp(card.device->name(), name)) {
             return i;
         }
     }
@@ -428,6 +440,19 @@ std::string SdlAudioPlayer::getCardName(int cardId)
 const char* SdlAudioPlayer::devtypestr(int iscapture)
 {
     return iscapture ? "capture" : "output";
+}
+
+void SdlAudioPlayer::print_card_info(int cardId)
+{
+    if(cardId>=0&&cardId<MAX_CARD_NUM) {
+        SoundCard &card = mCardArray[cardId];
+
+        std::lock_guard<std::mutex> lk(card.mutex);
+
+        if(card.device) {
+            card.device->print_status();
+        }
+    }
 }
 
 void SdlAudioPlayer::printDevices()

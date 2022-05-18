@@ -1,9 +1,7 @@
 ﻿#include "SdlAudioDevice.h"
 #include <memory>
-#include <QDebug>
 
-#define INFO(fmt,...) qDebug(fmt, ##__VA_ARGS__)
-//#define INFO(fmt,...) SDL_LogInfo(SDL_LOG_CATEGORY_AUDIO, fmt, ##__VA_ARGS__)
+#define INFO(fmt,...) SDL_LogInfo(SDL_LOG_CATEGORY_AUDIO, fmt, ##__VA_ARGS__)
 #define WARNING(fmt,...) SDL_LogWarn(SDL_LOG_CATEGORY_AUDIO, fmt, ##__VA_ARGS__)
 #define ERROR(fmt,...) SDL_LogError(SDL_LOG_CATEGORY_AUDIO, fmt, ##__VA_ARGS__)
 
@@ -48,7 +46,7 @@ int SdlAudioDevice::open(const char *device, SDL_AudioSpec spec)
         SDL_PauseAudioDevice(mDeviceId, 0); /* start audio playing. */
         INFO("SDL_AudioDeviceID: %d", mDeviceId);
         mDesiredSpec = spec;
-        memccpy(mDeviceName, device, '\0', sizeof(mDeviceName));
+        strncpy(mDeviceName, device?device:"none", sizeof(mDeviceName));
         mState = Open;
         return mDeviceId;
     }
@@ -75,11 +73,15 @@ void SdlAudioDevice::resume()
 void SdlAudioDevice::close()
 {
     mState = Close;
-    SDL_PauseAudioDevice(mDeviceId, 1);
-    clearAll();
-    SDL_CloseAudioDevice(mDeviceId);
+    if(mDeviceId!=0) {
+        SDL_PauseAudioDevice(mDeviceId, 1);
+        SDL_CloseAudioDevice(mDeviceId);
+    }
+
     INFO("SDL_CloseAudioDevice: %d", mDeviceId);
+
     mDeviceId = 0;
+    clearAll();
 }
 
 void SdlAudioDevice::addData(int index, Uint8* buf, int len,
@@ -258,12 +260,17 @@ bool SdlAudioDevice::isOpened()
 
 void SdlAudioDevice::print_status()
 {
+    if(mDeviceId==0) {
+        INFO("Current Audio(devid:%d) is invalid", mDeviceId);
+        return;
+    }
+
     switch (SDL_GetAudioDeviceStatus(mDeviceId))
     {
-    case SDL_AUDIO_STOPPED: printf("Current Audio Status:stopped\n"); break;
-    case SDL_AUDIO_PLAYING: printf("Current Audio Status:playing\n"); break;
-    case SDL_AUDIO_PAUSED: printf("Current Audio Status:paused\n"); break;
-    default: printf("Current Audio Status:???"); break;
+    case SDL_AUDIO_STOPPED: INFO("Current Audio(devid:%d) Status:stopped", mDeviceId); break;
+    case SDL_AUDIO_PLAYING: INFO("Current Audio(devid:%d) Status:playing", mDeviceId); break;
+    case SDL_AUDIO_PAUSED: INFO("Current Audio(devid:%d) Status:paused", mDeviceId); break;
+    default: INFO("Current Audio(devid:%d) Status:???", mDeviceId); break;
     }
 }
 

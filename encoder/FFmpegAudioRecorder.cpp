@@ -180,6 +180,18 @@ int FFmpegAudioRecorder::open(const char *output, const char *format_name, enum 
            output, src_ch_layout, src_sample_fmt, src_sample_rate,
            format_name!=NULL?format_name:"", codec_id, avcodec_get_name(codec_id),
            out_ch_layout, out_sample_fmt, out_sample_rate);
+
+    AVOutputFormat *oformat = av_guess_format(NULL,output, NULL);
+    if (oformat) {
+        if(codec_id==AV_CODEC_ID_NONE) {
+            codec_id = oformat->audio_codec;
+        }
+        if((format_name==NULL||strlen(format_name)==0)
+                && codec_id==oformat->audio_codec) {
+            format_name = oformat->name;
+        }
+    }
+
     enc_samples = 0;
 
     AVCodec *pCodec = avcodec_find_encoder(codec_id);
@@ -471,7 +483,7 @@ int FFmpegAudioRecorder::encode_write_frame(AVFrame *filt_frame, int stream_inde
         av_packet_rescale_ts(&enc_pkt,
             enc_ctx->time_base,
             ofmt_ctx->streams[stream_index]->time_base);
-        /* write encoded frame */
+        /* mux encoded frame */
         ret = av_interleaved_write_frame(ofmt_ctx, &enc_pkt);
         write_pts += enc_pkt.duration;
         av_packet_unref(&enc_pkt);

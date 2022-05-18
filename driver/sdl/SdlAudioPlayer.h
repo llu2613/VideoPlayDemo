@@ -41,12 +41,12 @@ public:
     explicit SdlAudioPlayer();
     ~SdlAudioPlayer();
 
-    int openCard(std::string name,
+    int openCard(const char* name,
                  int freq,
                  SDL_AudioFormat format,
                  Uint8 channels,
                  Uint16 samples, int maxMemory);
-    int openCard(std::string name, SDL_AudioSpec wanted, int maxMemory);
+    int openCard(const char* name, SDL_AudioSpec wanted, int maxMemory);
     void pauseCard(int cardId, int ispause);
     void closeCard(int cardId);
     void addData(int cardId, int sourceId, Uint8 *buf, int bufLen, unsigned long timestamp);
@@ -60,11 +60,12 @@ public:
 
     std::list<std::string> devices();
 
-    int getCardId(std::string name);
+    int getCardId(const char* name);
     std::string getCardName(int cardId);
     int getCardIdByDevid(SDL_AudioDeviceID devid);
 
     const char* devtypestr(int iscapture);
+    void print_card_info(int cardId);
     void printDevices();
     void print_devices(int iscapture);
 
