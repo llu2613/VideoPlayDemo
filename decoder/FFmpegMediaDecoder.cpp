@@ -366,19 +366,29 @@ void FFmpegMediaDecoder::videoScaledData(AVFrame *frame, AVPacket *packet, int p
     }
 }
 
+/*
+FFMPEG 实现 YUV，RGB各种图像原始数据之间的转换（swscale）
+https://blog.csdn.net/x_iya/article/details/52299058
+*/
 void FFmpegMediaDecoder::fillPixelRGB24(MediaData *mediaData, AVFrame *frame,
                                         int pixelWidth, int pixelHeight)
 {
-    int numBytes = av_image_get_buffer_size(AV_PIX_FMT_RGB24, pixelWidth, pixelHeight, 0);
-    mediaData->data[0] = new unsigned char[numBytes];
-    mediaData->datasize[0] = numBytes;
+//    fwrite(pFrameYUV->data[0],(pCodecCtx->width)*(pCodecCtx->height)*3,1,output);
+
+    int frameSize = av_image_get_buffer_size(AV_PIX_FMT_RGB24, pixelWidth, pixelHeight, 1);
+    mediaData->data[0] = new unsigned char[frameSize];
+    mediaData->datasize[0] = frameSize;
     mediaData->linesize[0] = frame->linesize[0];
-    memcpy(&(mediaData->data[0]), frame->data[0], numBytes);
+    memcpy(mediaData->data[0], frame->data[0], frameSize);
 }
 
 void FFmpegMediaDecoder::fillPixelYUV420P(MediaData *mediaData, AVFrame *frame,
                                          int pixelWidth, int pixelHeight)
 {
+//    fwrite(pFrameYUV->data[0],(pCodecCtx->width)*(pCodecCtx->height),1,output);
+//    fwrite(pFrameYUV->data[1],(pCodecCtx->width)*(pCodecCtx->height)/4,1,output);
+//    fwrite(pFrameYUV->data[2],(pCodecCtx->width)*(pCodecCtx->height)/4,1,output);
+
     int y_size = pixelWidth * pixelHeight;
     int dataSize[] = {y_size, y_size / 4, y_size / 4};
     for(int i=0; i<3; i++) {

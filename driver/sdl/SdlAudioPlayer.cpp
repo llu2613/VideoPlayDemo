@@ -117,7 +117,7 @@ void SdlAudioPlayer::addData(int cardId, int sourceId, Uint8 *buf, int bufLen,
             card.device->addData(sourceId, buf, bufLen, timestamp);
             card.device->resume();
         } else {
-            WARNING("Sound card is not initiailizing, cardId:%d", cardId);
+            WARNING("Sound card is not initialized, cardId:%d", cardId);
         }
     } else {
         WARNING("SoundCard %d is disable!", cardId);
@@ -139,7 +139,7 @@ void SdlAudioPlayer::setVolume(int cardId, int volume)
     if(card.device) {
         card.device->setMixVolume(volume);
     } else {
-        INFO("Sound card is not initiailizing, cardId:%d", cardId);
+        INFO("Sound card is not initialized, cardId:%d", cardId);
     }
     card.mutex.unlock();
 }
@@ -159,7 +159,7 @@ int SdlAudioPlayer::volume(int cardId)
     if(card.device) {
         val = card.device->mixVolume();
     } else {
-        INFO("Sound card is not initiailizing, cardId:%d", cardId);
+        INFO("Sound card is not initialized, cardId:%d", cardId);
     }
     card.mutex.unlock();
 
@@ -180,7 +180,7 @@ void SdlAudioPlayer::clearData(int cardId, int sourceId)
     if(card.device) {
         card.device->clear(sourceId);
     } else {
-        INFO("Sound card is not initiailizing, cardId:%d", cardId);
+        INFO("Sound card is not initialized, cardId:%d", cardId);
     }
     card.mutex.unlock();
 }
@@ -199,7 +199,7 @@ void SdlAudioPlayer::clearCardData(int cardId)
     if(card.device) {
         card.device->clearAll();
     } else {
-        INFO("Sound card is not initiailizing, cardId:%d", cardId);
+        INFO("Sound card is not initialized, cardId:%d", cardId);
     }
     card.mutex.unlock();
 }
@@ -359,7 +359,7 @@ int SdlAudioPlayer::bufferSize(int cardId, int sourceId)
     if(card.device) {
         size = card.device->bufferSize(sourceId);
     } else {
-        INFO("Sound card is not initiailizing, cardId:%d", cardId);
+        INFO("Sound card is not initialized, cardId:%d", cardId);
     }
     card.mutex.unlock();
 
