@@ -187,7 +187,29 @@ void VideoWidget::onVideoData(std::shared_ptr<MediaData> mediaData)
 {
     if(mediaData->pixel_format==AV_PIX_FMT_YUV420P) {
         videoBuffer.addData(mediaData.get());
-    } else {
+    } else if(mediaData->pixel_format==AV_PIX_FMT_RGB24) {
+//      {
+//          QFile file("D:\\1.jpg");
+//          if(file.open(QIODevice::ReadOnly)){
+//              QByteArray data = file.readAll();
+//              mImage = QImage::fromData(data);
+//              file.close();
+//          }
+//      }
+
+//        {
+//            static int aaa = 0;
+//            QImage img = QImage(mediaData->width, mediaData->height, QImage::Format_RGB888);
+//            for(int y = 0; y < mediaData->height; ++y) {
+//                memcpy(img.scanLine(y), mediaData->data[0]+y*mediaData->linesize[0],
+//                        mediaData->linesize[0]);
+//            }
+//            QFile file(QString("D://%1.jpg").arg(aaa++));
+//            if (file.open(QFile::WriteOnly)) {
+//                img.save(&file, "JPG");
+//                file.close();
+//            }
+//        }
         qDebug()<<"Unsupported video format:"<<mediaData->pixel_format;
     }
 }

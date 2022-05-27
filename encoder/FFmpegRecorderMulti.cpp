@@ -58,8 +58,7 @@ int FFmpegRecorderMulti::addData(AVFrame *frame, AVPacket *packet)
     else
         add_samples = 0;
 
-    int channels = av_get_channel_layout_nb_channels(src_ch_layout);
-    long seconds = add_samples/src_sample_rate/(channels>0?channels:1);
+    long seconds = add_samples/src_sample_rate;
     if(seconds>=numeral) {
         recorder.close();
         segment_count++;
