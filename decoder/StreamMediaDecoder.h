@@ -20,7 +20,7 @@ public:
 
     void setOutAudio2(int rate, int channels);
     void setOutVideo2(int width, int height);
-    AVSynchronizer* getSynchronizer();
+    std::shared_ptr<AVSynchronizer> &getSynchronizer();
 
     void setInputUrl();
 
@@ -41,7 +41,7 @@ private:
     RepeatableThread mThread;
     QMutex mStopMutex;
     bool mStopFlag;
-    AVSynchronizer *syncer;
+    std::shared_ptr<AVSynchronizer> syncer;
     unsigned long audio_ts, video_ts;
 
     QString mInputUrl;

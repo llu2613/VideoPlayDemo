@@ -51,8 +51,11 @@ static uint64_t select_channel_layout(const AVCodec *codec, uint64_t default_lay
 
     p = codec->channel_layouts;
     while (*p) {
-        int nb_channels = av_get_channel_layout_nb_channels(*p);
+        if(default_layout==*p) {
+            return default_layout;
+        }
 
+        int nb_channels = av_get_channel_layout_nb_channels(*p);
         if (nb_channels > best_nb_channels) {
             best_ch_layout    = *p;
             best_nb_channels = nb_channels;
@@ -552,7 +555,7 @@ void FFmpegAudioRecorder::statistics()
             enc_samples, audio_pts, write_pts,
             enc_ctx?enc_ctx->time_base.num:0, enc_ctx?enc_ctx->time_base.den:0);
 
-    av_log(NULL, AV_LOG_INFO, text);
+    av_log(NULL, AV_LOG_DEBUG, text);
 }
 
 void FFmpegAudioRecorder::close()

@@ -2,19 +2,18 @@
 #include <QDebug>
 
 StreamMediaDecoder::StreamMediaDecoder(QObject *parent)
-    : QObject(parent), mThread(this)
+    : QObject(parent), mThread(this), syncer(new AVSynchronizer)
 {
     //TEST
     fp_pcm = 0;
     fp_yuv = 0;
 
     mediaDecoder.setCallback(this);
-    syncer = new AVSynchronizer;
 }
 
 StreamMediaDecoder::~StreamMediaDecoder()
 {
-    delete syncer;
+
 }
 
 void StreamMediaDecoder::setOutAudio2(int rate, int channels)
@@ -31,7 +30,7 @@ void StreamMediaDecoder::setOutVideo2(int width, int height)
     mediaDecoder.setOutVideo(fmt, width, height);
 }
 
-AVSynchronizer* StreamMediaDecoder::getSynchronizer()
+std::shared_ptr<AVSynchronizer> &StreamMediaDecoder::getSynchronizer()
 {
     return syncer;
 }
@@ -101,6 +100,7 @@ void StreamMediaDecoder::run()
     bool haveAudio = mediaDecoder.audioStream()?true:false;
 
     bool isDecoding = true;
+    syncer->resetOsTime();
     for (int loopCnt=0;isDecoding;) {
         //TEST
         if(fp_pcm||fp_yuv) {
@@ -127,8 +127,13 @@ void StreamMediaDecoder::run()
                 isDecoding = false;
             mStopMutex.unlock();
 
-            if((haveAudio && syncer->getAudioDelaySec()>1)
-                    ||(haveVideo && syncer->getVideoDelaySec()>1)) {
+//            if((haveAudio && syncer->getAudioDelaySec()>1)
+//                    ||(haveVideo && syncer->getVideoDelaySec()>1)) {
+//                QThread::msleep(10);
+//            } else {
+//                break;
+//            }
+            if(syncer->getOsDelaySec()>1) {
                 QThread::msleep(10);
             } else {
                 break;

@@ -74,7 +74,8 @@ void SmtAudioPlayer::initialize()
     }
 }
 
-void SmtAudioPlayer::setSync(int sourceId, AVSynchronizer *sync) {
+void SmtAudioPlayer::setSync(int sourceId, std::shared_ptr<AVSynchronizer> &sync)
+{
     if(!sync)
         return;
 

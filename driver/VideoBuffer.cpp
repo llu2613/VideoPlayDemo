@@ -29,7 +29,7 @@ VideoBuffer::~VideoBuffer()
     clear();
 }
 
-void VideoBuffer::setSync(AVSynchronizer *sync)
+void VideoBuffer::setSync(std::shared_ptr<AVSynchronizer> &sync)
 {
     mSyncMutex.lock();
     mSync = sync;

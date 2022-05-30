@@ -11,31 +11,41 @@ public:
     ~AVSynchronizer();
 
     void reset();
+    void resetOsTime();
     void setAudioTimeBaseD(double time_base_d);
     void setVideoTimeBaseD(double time_base_d);
 
-    void setAudioDecodingTs(unsigned long ts);
-    void setVideoDecodingTs(unsigned long ts);
-    void setAudioPlayingTs(unsigned long ts);
-    void setVideoPlayingTs(unsigned long ts);
+    void setAudioDecodingTs(long ts);
+    void setVideoDecodingTs(long ts);
+    void incAudioDecodingTs(long ts);
+    void incVideoDecodingTs(long ts);
 
-    unsigned long audioDecodingTs();
-    unsigned long videoDecodingTs();
-    unsigned long audioPlayingTs();
-    unsigned long videoPlayingTs();
+    void setAudioPlayingTs(long ts);
+    void setVideoPlayingTs(long ts);
+    void incAudioPlayingTs(long ts);
+    void incVideoPlayingTs(long ts);
 
-    unsigned long getAudioDelayTs();
-    unsigned long getVideoDelayTs();
+    long audioDecodingTs();
+    long videoDecodingTs();
+    long audioPlayingTs();
+    long videoPlayingTs();
+
+    long getAudioDelayTs();
+    long getVideoDelayTs();
 
     double getAudioDelaySec();
     double getVideoDelaySec();
 
+    double getOsDelaySec();
+
 private:
     std::recursive_mutex mMutex;
-    unsigned long audio_play_ts, video_play_ts;
-    unsigned long audio_decode_ts, video_decode_ts;
+    long audio_play_ts, video_play_ts;
+    long audio_decode_ts, video_decode_ts;
     double audio_time_base_d, video_time_base_d;
 
+    long start_os_msecond;
+    long start_audio_decode_ts, start_video_decode_ts;
 };
 
 #endif // AVSYNCHRONIZER_H

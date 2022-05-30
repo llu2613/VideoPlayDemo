@@ -27,7 +27,7 @@ public:
 
     void initialize();
 
-    void setSync(int sourceId, AVSynchronizer *sync);
+    void setSync(int sourceId, std::shared_ptr<AVSynchronizer> &sync);
     void removeSync(int sourceId);
     void addData(int cardId, int sourceId, MediaData *data);
 
@@ -54,7 +54,7 @@ private:
 
     SDL_AudioSpec mAudioSpec;
     QTextCodec *mTextCodec;
-    LockedMap<int, AVSynchronizer*> mSyncMap;
+    LockedMap<int, std::shared_ptr<AVSynchronizer>> mSyncMap;
     LockedMap<int, AudioSource> mSourceInfoMap;
     WaveformProcessor mWaveformProcessor;
     SdlEventDispatcher mSdlEventDispatcher;

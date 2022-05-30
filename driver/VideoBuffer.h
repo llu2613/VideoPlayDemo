@@ -15,7 +15,7 @@ public:
     explicit VideoBuffer(QString tag, QObject *parent = nullptr);
     ~VideoBuffer();
 
-    void setSync(AVSynchronizer *sync);
+    void setSync(std::shared_ptr<AVSynchronizer> &sync);
     void addData(MediaData *data);
 
     void clear();
@@ -28,7 +28,7 @@ private:
     long mMemorySize;
 
     QMutex mSyncMutex;
-    AVSynchronizer *mSync;
+    std::shared_ptr<AVSynchronizer> mSync;
 
     bool isThRunning;
     void run();
