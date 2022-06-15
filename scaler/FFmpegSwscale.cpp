@@ -3,12 +3,17 @@
 FFmpegSwscale::FFmpegSwscale()
 {
     swsCtx = nullptr;
+
+    ctx = avformat_alloc_context();
 }
 
 FFmpegSwscale::~FFmpegSwscale()
 {
     if(swsCtx)
         sws_freeContext(swsCtx);
+
+    if(ctx)
+        avformat_free_context(ctx);
 }
 
 int FFmpegSwscale::init(AVCodecContext *pCodecCtx,
@@ -29,11 +34,14 @@ int FFmpegSwscale::init(enum AVPixelFormat in_pixel_fmt, int in_width, int in_he
     out_frame_width = out_width;
     out_frame_height = out_height;
 
+    if(swsCtx)
+        sws_freeContext(swsCtx);
+
     swsCtx = sws_getContext(in_width,in_height,in_pixel_fmt,
                             out_width, out_height, out_pixel_fmt,
                             SWS_BICUBIC, NULL, NULL, NULL);
     if(!swsCtx) {
-        printf("swr_init failed");
+        av_log(ctx, AV_LOG_ERROR, "swr_init failed");
         return -1;
     }
 
@@ -53,7 +61,7 @@ int FFmpegSwscale::mallocOutFrame(AVFrame **out_frame, uint8_t **out_buffer, int
     *out_buffer = (uint8_t *)av_malloc(out_count);
 
     if(!(*out_buffer)) {
-        printf("no memory alloc to out_buffer");
+        av_log(ctx, AV_LOG_ERROR, "no memory alloc to out_buffer");
         return -1;
     }
 
@@ -80,12 +88,12 @@ void FFmpegSwscale::freeOutFrame(AVFrame **out_frame, uint8_t **out_buffer, int 
 int FFmpegSwscale::scale(AVFrame *pFrame, int srcSliceH, AVFrame *pOutFrame)
 {
     if(!swsCtx) {
-        printf("swsCtx is null");
+        av_log(ctx, AV_LOG_ERROR, "swsCtx is null");
         return -1;
     }
 
     if(!pOutFrame) {
-        printf("pOutFrame is null");
+        av_log(ctx, AV_LOG_ERROR, "pOutFrame is null");
         return -1;
     }
 

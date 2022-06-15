@@ -24,6 +24,8 @@ public:
 
     void close();
 
+    bool isRecording();
+
 protected:
     void onRecordError(int level, const char* msg);
 
@@ -33,6 +35,7 @@ private:
     long numeral;
     long add_samples;
     int segment_count;
+    bool is_open;
 
     int64_t  src_ch_layout;
     enum AVSampleFormat src_sample_fmt;

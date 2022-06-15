@@ -304,7 +304,8 @@ AVFrame* FFmpegMediaScaler::videoScale(int pixelHeight, AVFrame *frame, int *out
 
 void FFmpegMediaScaler::printError(int code, const char* message)
 {
-    printf("FFmpegMediaScaler Error code:%d msg:%s\n", code, message);
+    av_log(NULL, AV_LOG_ERROR,
+           "FFmpegMediaScaler Error code:%d msg:%s\n", code, message);
 }
 
 void FFmpegMediaScaler::print_error(const char *name, int err)

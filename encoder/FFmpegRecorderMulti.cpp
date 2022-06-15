@@ -10,6 +10,8 @@ FFmpegRecorderMulti::FFmpegRecorderMulti()
     out_sample_fmt = AV_SAMPLE_FMT_NONE;
     out_sample_rate = 0;
 
+    is_open = false;
+
     recorder.setCallback(this);
 }
 
@@ -21,7 +23,8 @@ FFmpegRecorderMulti::~FFmpegRecorderMulti()
 
 void FFmpegRecorderMulti::setMaxSeconds(long numeral)
 {
-    this->numeral = numeral;
+    if(!is_open)
+        this->numeral = numeral;
 }
 
 int FFmpegRecorderMulti::open(const char *output,
@@ -41,28 +44,35 @@ int FFmpegRecorderMulti::open(const char *output,
     this->out_sample_fmt = out_sample_fmt;
     this->out_sample_rate = out_sample_rate;
 
+    is_open = true;
+
     return 0;
 }
 
 int FFmpegRecorderMulti::addData(AVFrame *frame, AVPacket *packet)
 {
     if(!recorder.isReady()) {
-        recorder.open(segmentFileName(filename, segment_count).data(),
+        std::string segment = numeral>0?segmentFileName(filename, segment_count):filename;
+        recorder.open(segment.data(),
                       src_ch_layout, src_sample_fmt, src_sample_rate,
                       out_ch_layout, out_sample_fmt, out_sample_rate);
         add_samples = 0;
     }
+
     int ret = recorder.addData(frame, packet);
     if(ret>=0)
         add_samples += frame->nb_samples;
-    else
+    else {
         add_samples = 0;
+        printf("ERROR recorder.addData() ret %d,add_samples reset 0!!!", ret);
+    }
 
-    long seconds = add_samples/src_sample_rate;
-    if(seconds>=numeral) {
+    if(numeral>0 &&
+            (add_samples/src_sample_rate)>=numeral) {
         recorder.close();
         segment_count++;
     }
+
     return ret;
 }
 
@@ -77,12 +87,18 @@ void FFmpegRecorderMulti::close()
     out_ch_layout = 0;
     out_sample_fmt = AV_SAMPLE_FMT_NONE;
     out_sample_rate = 0;
+
+    is_open = false;
 }
 
-#include <QDebug>
+bool FFmpegRecorderMulti::isRecording()
+{
+    return recorder.isReady() || is_open;
+}
+
 void FFmpegRecorderMulti::onRecordError(int level, const char* msg)
 {
-    qDebug()<<"onRecordError"<<msg;
+    printf("onRecordError level:%d, msg:%s", level, msg);
 }
 
 std::string FFmpegRecorderMulti::segmentFileName(std::string filename, int segment)
@@ -92,8 +108,10 @@ std::string FFmpegRecorderMulti::segmentFileName(std::string filename, int segme
         char ch = filename[i];
         if(ch=='\\'||ch=='/')
             break;
-        else if(ch=='.')
+        else if(ch=='.') {
             index = i;
+            break;
+        }
     }
     if(index!=-1) {
         char seg[32];

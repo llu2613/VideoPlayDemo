@@ -3,8 +3,6 @@
 #include <stdlib.h>
 #include <QDebug>
 
-#define LOG(...) qDebug(__VA_ARGS__)
-
 /*
  * FFmpeg 示例硬件解码hw_decode
  * https://www.jianshu.com/p/3ea9ef713211
@@ -153,7 +151,7 @@ int FFmpegMediaDecoder::audioRawFrame(AVCodecContext *pCodecCtx, AVFrame *frame,
 
 	ret = avcodec_send_packet(pCodecCtx, packet);
     if (ret < 0) {
-        print_error("avcodec_decode_audio4", ret);
+        print_averror("avcodec_decode_audio4", ret);
         return ret;
     }
 
@@ -180,13 +178,13 @@ int FFmpegMediaDecoder::decode_video_frame_hw(AVCodecContext *pCodecCtx, AVFrame
     AVFrame *sw_frame = NULL;
 
     if (!(sw_frame = av_frame_alloc())) {
-        print_error("Can not alloc frame", -1);
+        print_averror("Can not alloc frame", -1);
         return ret;
     }
 
     ret = avcodec_send_packet(pCodecCtx, packet);
     if (ret < 0) {
-        print_error("avcodec_send_packet", ret);
+        print_averror("avcodec_send_packet", ret);
         return ret;
     }
 
@@ -196,14 +194,14 @@ int FFmpegMediaDecoder::decode_video_frame_hw(AVCodecContext *pCodecCtx, AVFrame
             break;
         } else if (errcode < 0) {
             ret = errcode;
-            print_error("Error while decoding", ret);
+            print_averror("Error while decoding", ret);
             break;
         }
 
         if(!sws_isSupportedInput((AVPixelFormat)sw_frame->format)) {
             /* retrieve data from GPU to CPU */
             if ((ret = av_hwframe_transfer_data(frame, sw_frame, 0)) < 0) {
-                print_error("Error transferring the data to system memory", ret);
+                print_averror("Error transferring the data to system memory", ret);
                 break;
             }
         } else {
@@ -231,7 +229,7 @@ int FFmpegMediaDecoder::decode_video_frame(AVCodecContext *pCodecCtx, AVFrame *f
 
     ret = avcodec_send_packet(pCodecCtx, packet);
     if (ret < 0) {
-        print_error("avcodec_decode_video2", ret);
+        print_averror("avcodec_decode_video2", ret);
         return ret;
     }
 
@@ -332,7 +330,7 @@ void FFmpegMediaDecoder::audioResampledData(AVPacket *packet, uint8_t *sampleBuf
         memcpy(mediaData->data[0], sampleBuffer, bufferSize);
         audioDataReady(mediaData);
     } catch(...) {
-        LOG("audioDecodedData failed share data!");
+        printInfo(0, "audioDecodedData failed share data!");
     }
 }
 
@@ -362,7 +360,7 @@ void FFmpegMediaDecoder::videoScaledData(AVFrame *frame, AVPacket *packet, int p
         }
         videoDataReady(mediaData);
     } catch(...) {
-        LOG("videoDecodedData failed share data!");
+        printInfo(0, "videoDecodedData failed share data!");
     }
 }
 
@@ -510,18 +508,18 @@ int FFmpegMediaDecoder::openHwCodec(AVFormatContext *pFormatCtx, int stream_idx,
     }
 
     if ((ret=avcodec_parameters_to_context(*pCodeCtx, pCodecPar)) < 0) {
-        print_error("avcodec_parameters_to_context", ret);
+        print_averror("avcodec_parameters_to_context", ret);
         return ret;
     }
 
     if ((ret=hw_decoder_init(*pCodeCtx, config->device_type)) < 0) {
-        print_error("Failed to init specified HW device", ret);
+        print_averror("Failed to init specified HW device", ret);
         return -1;
     }
 
     ret = avcodec_open2(*pCodeCtx, pCodec, NULL);
     if (ret < 0) {
-        print_error("failed to open codec", ret);
+        print_averror("failed to open codec", ret);
         return ret;
     }
 
@@ -640,14 +638,14 @@ int FFmpegMediaDecoder::open(const char* input,
     av_dict_free(&options);
     if (ret != 0) {
         //qDebug()<<QString::fromLocal8Bit(input);
-        print_error("avformat_open_input", ret);
+        print_averror("avformat_open_input", ret);
         return ret;
     }
 
     //3.获取视频文件信息
     ret = avformat_find_stream_info(pFormatCtx,NULL);
     if (ret < 0) {
-        print_error("avformat_find_stream_info", ret);
+        print_averror("avformat_find_stream_info", ret);
         return ret;
     }
 
@@ -752,7 +750,7 @@ int FFmpegMediaDecoder::decoding()
         if(AVERROR_EOF==readRet) {
             mStatus = EndOfFile;
         }
-        print_error("av_read_frame", readRet);
+        print_averror("av_read_frame", readRet);
         return readRet;
     }
 
@@ -869,17 +867,18 @@ void FFmpegMediaDecoder::printCodecInfo(AVCodecContext *pCodeCtx)
         }
         //输出音频信息
         AVCodec *pCodec = avcodec_find_decoder(pCodeCtx->codec_id);
-        LOG("audio file format: %s",pFormatCtx->iformat->name);
-        LOG("audio duration: %d", (pFormatCtx->duration!=AV_NOPTS_VALUE)?
+        print_info("audio file format: %s",pFormatCtx->iformat->name);
+        print_info("audio duration: %d", (pFormatCtx->duration!=AV_NOPTS_VALUE)?
                 (pFormatCtx->duration/AV_TIME_BASE):0);
-        LOG("audio stream duration: %d", streamDuration);
-        LOG("audio channels: (lt:%d) %d", pCodeCtx->channel_layout, pCodeCtx->channels);
-        LOG("audio sample rate: %d",pCodeCtx->sample_rate);
-        LOG("audio sample accuracy: (fmt:%d) %d",pCodeCtx->sample_fmt,
+        print_info("audio stream duration: %d", streamDuration);
+        print_info("audio channels: (lt:%d) %d", pCodeCtx->channel_layout, pCodeCtx->channels);
+        print_info("audio sample rate: %d",pCodeCtx->sample_rate);
+        print_info("audio sample accuracy: (fmt:%d) %d",pCodeCtx->sample_fmt,
                av_get_bytes_per_sample(pCodeCtx->sample_fmt)<<3);
-        LOG("audio bit rate: %d",pCodeCtx->bit_rate);
-        if(pCodec)
-            LOG("audio decode name: %s", pCodec->name);
+        print_info("audio bit rate: %d",pCodeCtx->bit_rate);
+        if(pCodec) {
+            print_info("audio decode name: %s", pCodec->name);
+        }
     } else if(pCodeCtx->codec_type==AVMEDIA_TYPE_VIDEO) {
         int64_t streamDuration = 0;
         if(video_stream_idx>=0 && video_stream_idx<pFormatCtx->nb_streams) {
@@ -888,20 +887,21 @@ void FFmpegMediaDecoder::printCodecInfo(AVCodecContext *pCodeCtx)
         }
         //输出视频信息
         AVCodec *pCodec = avcodec_find_decoder(pCodeCtx->codec_id);
-        LOG("video file format: %s",pFormatCtx->iformat->name);
-        LOG("video duration: %d", (pFormatCtx->duration!=AV_NOPTS_VALUE)?
+        print_info("video file format: %s",pFormatCtx->iformat->name);
+        print_info("video duration: %d", (pFormatCtx->duration!=AV_NOPTS_VALUE)?
                 (pFormatCtx->duration/AV_TIME_BASE):0);
-        LOG("video stream duration: %d", streamDuration);
-        LOG("video frame pixel format: %d", pCodeCtx->pix_fmt);
-        LOG("video frame size: %d,%d",pCodeCtx->width, pCodeCtx->height);
-        if(pCodec)
-            LOG("video decode name: %s", pCodec->name);
+        print_info("video stream duration: %d", streamDuration);
+        print_info("video frame pixel format: %d", pCodeCtx->pix_fmt);
+        print_info("video frame size: %d,%d",pCodeCtx->width, pCodeCtx->height);
+        if(pCodec) {
+            print_info("video decode name: %s", pCodec->name);
+        }
         if(pCodeCtx->extradata&&pCodeCtx->extradata_size) {
             char *buf = (char*)av_malloc(pCodeCtx->extradata_size+1);
             if(buf) {
                 memcpy(buf, pCodeCtx->extradata, pCodeCtx->extradata_size);
                 buf[pCodeCtx->extradata_size] = '\0';
-                LOG("video extradata: %s", buf);
+                print_info("video extradata: %s", buf);
                 av_freep(&buf);
             }
         }
@@ -918,17 +918,40 @@ void FFmpegMediaDecoder::_printError(int code, const char* message)
     printError(code, message);
 }
 
+void FFmpegMediaDecoder::printInfo(int code, const char* message)
+{
+    mCallbackMutex.lock();
+    if(mCallback)
+        mCallback->onDecodeError(code, message);
+    mCallbackMutex.unlock();
+}
+
 void FFmpegMediaDecoder::printError(int code, const char* message)
 {
     mCallbackMutex.lock();
     if(mCallback)
         mCallback->onDecodeError(code, message);
-    else
-        qDebug()<<"Decoder printError"<<QString::fromLocal8Bit(message);
     mCallbackMutex.unlock();
 }
 
-void FFmpegMediaDecoder::print_error(const char *name, int err)
+void FFmpegMediaDecoder::print_info(const char* fmt, ...)
+{
+    char printf_buf[512] = {0};
+    va_list args;
+    va_start(args, fmt);
+    vsprintf(printf_buf, fmt, args);
+    va_end(args);
+
+    int slen = strlen(printf_buf);
+    if(slen>0&&slen<511 &&
+            (printf_buf[slen]!='\n'||printf_buf[slen]!='\r')) {
+        printf_buf[slen] = '\n';
+        printf_buf[slen+1] = '\0';
+    }
+    printInfo(0, printf_buf);
+}
+
+void FFmpegMediaDecoder::print_averror(const char *name, int err)
 {
     char errbuf[200], message[256];
     const char *errbuf_ptr = errbuf;

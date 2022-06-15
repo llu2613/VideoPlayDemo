@@ -40,6 +40,7 @@ public:
     uint64_t outChannelLayout();
 
 private:
+    AVFormatContext *ctx;
     SwrContext *swrCtx;
 
     enum AVSampleFormat in_sample_fmt, out_sample_fmt;

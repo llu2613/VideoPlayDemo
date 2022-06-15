@@ -74,6 +74,7 @@ public:
     const AVStream* videoStream();
 
 protected:
+    virtual void printInfo(int code, const char* message);
     virtual void printError(int code, const char* message);
 
     virtual int audioRawFrame(AVCodecContext *pCodecCtx, AVFrame *frame, AVPacket *packet);
@@ -125,7 +126,8 @@ private:
 
     void printCodecInfo(AVCodecContext *pCodeCtx);
 
-    void print_error(const char *name, int err);
+    void print_info(const char* fmt, ...);
+    void print_averror(const char *name, int err);
 
     char mTag[256];
     Status mStatus;

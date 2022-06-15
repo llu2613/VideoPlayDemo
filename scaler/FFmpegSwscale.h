@@ -38,6 +38,7 @@ public:
     int outWidth();
 
 private:
+    AVFormatContext *ctx;
     struct SwsContext *swsCtx;
 
     int in_frame_width, in_frame_height;

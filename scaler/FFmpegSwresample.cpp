@@ -3,11 +3,16 @@
 FFmpegSwresample::FFmpegSwresample()
 {
     swrCtx = swr_alloc();
+
+    ctx = avformat_alloc_context();
 }
 
 FFmpegSwresample::~FFmpegSwresample()
 {
     swr_free(&swrCtx);
+
+    if(ctx)
+        avformat_free_context(ctx);
 }
 
 int FFmpegSwresample::init(AVCodecContext *pCodeCtx,
@@ -36,7 +41,7 @@ int FFmpegSwresample::init(enum AVSampleFormat in_fmt, int in_rate, uint64_t in_
                        in_ch_layout, in_sample_fmt, in_sample_rate, 0, NULL);
     ret = swr_init(swrCtx);
     if(ret<0) {
-        printf("swr_init failed");
+        av_log(ctx, AV_LOG_ERROR, "swr_init failed");
         return ret;
     }
 
@@ -55,7 +60,7 @@ int FFmpegSwresample::mallocOutBuffer(uint8_t **out_buffer, int *out_buffer_size
     *out_buffer = (uint8_t *) av_malloc(out_count);
 
     if(!(*out_buffer)) {
-        printf("no memory alloc to out_buffer");
+        av_log(ctx, AV_LOG_ERROR, "no memory alloc to out_buffer");
         return -1;
     }
 
@@ -82,7 +87,7 @@ int FFmpegSwresample::convert(AVFrame *frame, uint8_t **out_buffer, int out_buff
 int FFmpegSwresample::convert(const uint8_t **in_buffer, int nb_samples,
                               uint8_t **out_buffer, int out_buffer_size) {
     if(!out_buffer) {
-        printf("out_buffer is null");
+        av_log(ctx, AV_LOG_ERROR, "out_buffer is null");
     }
 
     //重采样
