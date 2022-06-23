@@ -942,12 +942,6 @@ void FFmpegMediaDecoder::print_info(const char* fmt, ...)
     vsprintf(printf_buf, fmt, args);
     va_end(args);
 
-    int slen = strlen(printf_buf);
-    if(slen>0&&slen<511 &&
-            (printf_buf[slen]!='\n'||printf_buf[slen]!='\r')) {
-        printf_buf[slen] = '\n';
-        printf_buf[slen+1] = '\0';
-    }
     printInfo(0, printf_buf);
 }
 

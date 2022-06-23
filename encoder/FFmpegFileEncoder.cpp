@@ -28,6 +28,7 @@ static void ff_log_callback(void *avcl, int level, const char *fmt,
 	char logBuffer[2048];
 	int cnt = vsnprintf(logBuffer, sizeof(logBuffer) / sizeof(char), fmt, vl);
 	cout << logBuffer;
+	qDebug() << logBuffer;
 }
 
 FFmpegFileEncoder::FFmpegFileEncoder()
@@ -638,21 +639,21 @@ int FFmpegFileEncoder::encode_write_frame(AVFrame *filt_frame, unsigned int stre
             stream_ctx[stream_index].audio_pts += filt_frame->nb_samples;
         }
 
-        ret = avcodec_send_frame(stream_ctx[stream_index].enc_ctx, filt_frame);
-        if (ret < 0) {
-            av_log(NULL, AV_LOG_ERROR, "Error submitting the frame to the encoder, %s\n", wrap_av_err2str(ret));
-            //return ret;
-        }
+		ret = avcodec_send_frame(stream_ctx[stream_index].enc_ctx, filt_frame);
+		if (ret < 0) {
+			av_log(NULL, AV_LOG_ERROR, "Error submitting the frame to the encoder, %s\n", wrap_av_err2str(ret));
+			return ret;
+		}
 
 		while (1) {
-			ret = avcodec_receive_packet(stream_ctx[stream_index].enc_ctx, &enc_pkt);
-			if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
-				//av_log(NULL, AV_LOG_INFO, "Error of EAGAIN or EOF\n");
-				return 0;
-			}
-			else if (ret < 0) {
-				av_log(NULL, AV_LOG_ERROR, "Error during encoding, %s\n", wrap_av_err2str(ret));
-				return ret;
+			int ret = avcodec_receive_packet(stream_ctx[stream_index].enc_ctx, &enc_pkt);
+			if (ret < 0) {
+				if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
+					//av_log(NULL, AV_LOG_INFO, "Error of EAGAIN or EOF\n");
+				} else {
+					av_log(NULL, AV_LOG_ERROR, "Error during encoding, %s\n", wrap_av_err2str(ret));
+				}
+				break;
 			}
 			/* prepare packet for muxing */
 			enc_pkt.stream_index = stream_index;
@@ -667,8 +668,10 @@ int FFmpegFileEncoder::encode_write_frame(AVFrame *filt_frame, unsigned int stre
 			/* mux encoded frame */
 			ret = av_interleaved_write_frame(ofmt_ctx, &enc_pkt);
 			av_packet_unref(&enc_pkt);
-			if (ret < 0)
-				return ret;
+			if (ret < 0) {
+				av_log(NULL, AV_LOG_ERROR, "#%d enc av_interleaved_write_frame %s",
+					stream_index, wrap_av_err2str(ret));
+			}
 		}
 	} else {
         if(filt_frame) {
@@ -680,14 +683,14 @@ int FFmpegFileEncoder::encode_write_frame(AVFrame *filt_frame, unsigned int stre
         }
 
         ret = avcodec_send_frame(stream_ctx[stream_index].enc_ctx, filt_frame);
-        if(ret != 0) {
+        if(ret < 0) {
             av_log(NULL, AV_LOG_ERROR, "#%d enc avcodec_send_packet %s",
                    stream_index, wrap_av_err2str(ret));
-            //return ret;
+            return ret;
         }
         while (1) {
-            ret = avcodec_receive_packet(stream_ctx[stream_index].enc_ctx, &enc_pkt);
-            if(ret!=0) {
+            int ret = avcodec_receive_packet(stream_ctx[stream_index].enc_ctx, &enc_pkt);
+            if(ret < 0) {
                 break;
             }
             /* prepare packet for muxing */
@@ -703,6 +706,10 @@ int FFmpegFileEncoder::encode_write_frame(AVFrame *filt_frame, unsigned int stre
                 enc_timebase.num, enc_timebase.den, ofmt_timebase.num, ofmt_timebase.den);
             /* mux encoded frame */
             ret = av_interleaved_write_frame(ofmt_ctx, &enc_pkt);
+			if (ret < 0) {
+				av_log(NULL, AV_LOG_ERROR, "#%d enc av_interleaved_write_frame %s",
+					stream_index, wrap_av_err2str(ret));
+			}
         }
 		av_packet_unref(&enc_pkt);
 		return ret;
@@ -774,8 +781,7 @@ int FFmpegFileEncoder::filter_encode_write_frame(AVFrame *frame, unsigned int st
 
 	//av_log(NULL, AV_LOG_INFO, "Pushing decoded frame to filters\n");
 	/* push the decoded frame into the filtergraph */
-	ret = av_buffersrc_add_frame_flags(filter_ctx[stream_index].buffersrc_ctx,
-		frame, 0);
+	ret = av_buffersrc_add_frame_flags(filter_ctx[stream_index].buffersrc_ctx, frame, 0);
 	if (ret < 0) {
 		av_log(NULL, AV_LOG_ERROR, "Error while feeding the filtergraph\n");
 		return ret;
@@ -784,8 +790,7 @@ int FFmpegFileEncoder::filter_encode_write_frame(AVFrame *frame, unsigned int st
 	/* pull filtered frames from the filtergraph */
 	while (1) {
 		//av_log(NULL, AV_LOG_INFO, "Pulling filtered frame from filters\n");
-		ret = av_buffersink_get_frame(filter_ctx[stream_index].buffersink_ctx,
-			filt_frame);
+		ret = av_buffersink_get_frame(filter_ctx[stream_index].buffersink_ctx, filt_frame);
 		if (ret < 0) {
 			/* if no more frames for output - returns AVERROR(EAGAIN)
 			* if flushed and no more frames for output - returns AVERROR_EOF
@@ -849,12 +854,9 @@ int FFmpegFileEncoder::flush_encoder(unsigned int stream_index)
 //        flush_audio_fifo(stream_index);
 //    }
 
-	while (1) {
-		//av_log(NULL, AV_LOG_INFO, "Flushing stream #%u encoder\n", stream_index);
-        ret = encode_write_frame(NULL, stream_index);
-		if (ret < 0)
-			break;
-	}
+	//av_log(NULL, AV_LOG_INFO, "Flushing stream #%u encoder\n", stream_index);
+	ret = encode_write_frame(NULL, stream_index);
+	
 	return ret;
 }
 
@@ -877,9 +879,9 @@ int FFmpegFileEncoder::test()
 {
 #if 1
 	//输入要进行格式转换的文件
-    char intput_file[] = "D:\\test\\86E13DDC-7CFA-4B9C-A875-476257CD6A13_1625045310.flv";
+    char intput_file[] = "D:\\test\\webm\\10second.flv";//"D:\\test\\webm\\3857311_38573.flv";
 	//输出转换后的文件
-    char output_file[] = "D:\\test\\86E13DDC_out_.ts";
+    char output_file[] = "D:\\test\\webm\\video_out10.webm";
 #else //网络文件
 	//输入要进行格式转换的文件
     char intput_file[] = "D:\\test\\qinghuaci.mp4";
@@ -920,10 +922,16 @@ int FFmpegFileEncoder::transcoding(const char *intput_file, const char *output_f
 	}
 
 	/* read all packets */
+	int frame_cnt[32];
+	memset(frame_cnt, 0, sizeof(frame_cnt));
 	while (1) {
 		if ((ret = av_read_frame(ifmt_ctx, packet)) < 0)
 			break;
 		stream_index = packet->stream_index;
+
+		if (stream_index >= 0)
+			frame_cnt[stream_index]++;
+
 		type = ifmt_ctx->streams[packet->stream_index]->codecpar->codec_type;
 		av_log(NULL, AV_LOG_DEBUG, "Demuxer gave frame of stream_index %u\n",
 			stream_index);
@@ -946,13 +954,17 @@ int FFmpegFileEncoder::transcoding(const char *intput_file, const char *output_f
                        stream_index, wrap_av_err2str(ret));
                 break;
             }
-            for (int i=0;i<100;i++) {
+            while(1) {
                 ret = avcodec_receive_frame(stream_ctx[stream_index].dec_ctx, frame);
-                if (ret != 0) {
+                if (ret < 0) {
                     break;
                 }
-                /*cout <<"#"<< stream_index << " got_frame pts " << frame->pts <<" pkt_pts "<< frame->pkt_pts
-                    << " pkt_dts " << frame->pkt_dts << " pkt_dur " << frame->pkt_duration <<" be "<< frame->best_effort_timestamp << endl;*/
+				qDebug() << "#" << stream_index << " got_frame pts " << frame->pts << " pkt_pts " << frame->pkt_pts
+					<< " pkt_dts " << frame->pkt_dts << " pkt_dur " << frame->pkt_duration << " b_ts " << frame->best_effort_timestamp 
+					<<"frames"<< frame_cnt[stream_index];
+                cout <<"#"<< stream_index << " got_frame pts " << frame->pts <<" pkt_pts "<< frame->pkt_pts
+                    << " pkt_dts " << frame->pkt_dts << " pkt_dur " << frame->pkt_duration <<" b_ts "<< frame->best_effort_timestamp
+					<< "frames" << frame_cnt[stream_index] << endl;
                 frame->pts = frame->best_effort_timestamp;
                 ret = filter_encode_write_frame(frame, stream_index);
                 if (ret < 0) {
@@ -972,9 +984,34 @@ int FFmpegFileEncoder::transcoding(const char *intput_file, const char *output_f
 		}
 		av_packet_unref(packet);
 	}
-
+	for (int i = 0; i<sizeof(frame_cnt)/sizeof(int);i++) {
+		if(frame_cnt[i])
+			qDebug() << "frame_cnt: index" << i << ",frames"<<frame_cnt[i];
+	}
     /* flush filters and encoders */
     for (i = 0; i < ifmt_ctx->nb_streams; i++) {
+		/* flush decoder */
+		if (filter_ctx[i].filter_graph) {
+			frame = av_frame_alloc();
+			if (!frame) {
+				ret = AVERROR(ENOMEM);
+				break;
+			}
+			ret = avcodec_send_packet(stream_ctx[stream_index].dec_ctx, NULL);
+			while(1) {
+				ret = avcodec_receive_frame(stream_ctx[stream_index].dec_ctx, frame);
+				if (ret < 0) {
+					break;
+				}
+				frame->pts = frame->best_effort_timestamp;
+				ret = filter_encode_write_frame(frame, stream_index);
+				if (ret < 0) {
+					break;
+				}
+			}
+			av_frame_free(&frame);
+		}
+
         /* flush filter */
         if (!filter_ctx[i].filter_graph)
             continue;
@@ -993,6 +1030,7 @@ int FFmpegFileEncoder::transcoding(const char *intput_file, const char *output_f
     }
 
     av_write_trailer(ofmt_ctx);
+	avio_closep(&ofmt_ctx->pb);
 end:
 	av_packet_free(&packet);
 	av_frame_free(&frame);
@@ -1008,9 +1046,9 @@ end:
 	}
 	av_free(filter_ctx);
 	av_free(stream_ctx);
-	avformat_close_input(&ifmt_ctx);
 	if (ofmt_ctx && !(ofmt_ctx->oformat->flags & AVFMT_NOFILE))
 		avio_closep(&ofmt_ctx->pb);
+	avformat_close_input(&ifmt_ctx);
 	avformat_free_context(ofmt_ctx);
 	char errorstr[AV_ERROR_MAX_STRING_SIZE] = { 0 };
 	if (ret < 0)
