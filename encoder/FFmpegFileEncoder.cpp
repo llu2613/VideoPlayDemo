@@ -1059,5 +1059,5 @@ end:
 	ifmt_ctx = NULL;
 	ofmt_ctx = NULL;
 
-    return ret ? 1 : 0;
+    return ret;
 }

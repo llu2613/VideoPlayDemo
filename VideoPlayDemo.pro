@@ -54,6 +54,7 @@ DEFINES += QT_DEPRECATED_WARNINGS
 
 SOURCES += \
     common/yuv_pcm_file.cpp \
+    encoder/FFmpegH264Video.cpp \
     encoder/FFmpegRecorderMulti.cpp \
     hw_decode.c \
         main.cpp \
@@ -95,6 +96,7 @@ SOURCES += \
 
 HEADERS += \
     common/yuv_pcm_file.h \
+    encoder/FFmpegH264Video.h \
     encoder/FFmpegRecorderMulti.h \
         mainwindow.h \
     encoder/FFmpegFileEncoder.h \

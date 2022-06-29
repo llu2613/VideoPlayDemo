@@ -5,6 +5,7 @@
 #include "encoder/FFmpegFileEncoder.h"
 #include "encoder/FFmpegFileMerger.h"
 #include "encoder/FFmpegAudioMerger.h"
+#include "encoder/FFmpegH264Video.h"
 #include "decoder/m3u8parsing.h"
 //#include "vld.h"
 
@@ -116,6 +117,10 @@ int main(int argc, char *argv[])
 
 //    FFmpegFileMerger merger;
 //    merger.test2();
+
+    FFmpegH264Video h264video;
+    h264video.h264_avc1("D:\\test\\webm\\1112223334445556667778881_1656466868.mp4",
+                   "D:\\test\\webm\\sssssssssssss.mp4");
 
     MainWindow w;
     w.show();

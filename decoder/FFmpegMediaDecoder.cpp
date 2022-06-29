@@ -955,5 +955,4 @@ void FFmpegMediaDecoder::print_averror(const char *name, int err)
     av_log(NULL, AV_LOG_ERROR, "%s: %s\n", name, errbuf_ptr);
 
     sprintf(message, "(%s)%s", name, errbuf_ptr);
-    printError(err, message);
 }
