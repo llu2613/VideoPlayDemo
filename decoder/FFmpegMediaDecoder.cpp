@@ -68,6 +68,7 @@ FFmpegMediaDecoder::FFmpegMediaDecoder()
     lastFrameRealtime = 0;
     mInterruptTimeout = INTERRUPT_TIMEOUT;
     memset(mTag, 0, sizeof(mTag));
+    memset(mInputUrl, 0 ,sizeof(mInputUrl));
 }
 
 FFmpegMediaDecoder::~FFmpegMediaDecoder()
@@ -634,6 +635,7 @@ int FFmpegMediaDecoder::open(const char* input,
     mStatus = Broken;
 
     //2.打开输入视频文件
+    strncmp(mInputUrl, input, sizeof(mInputUrl));
     ret = avformat_open_input(&pFormatCtx, input, NULL, &options);
     av_dict_free(&options);
     if (ret != 0) {
@@ -834,12 +836,7 @@ bool FFmpegMediaDecoder::isHwaccels()
 
 const char* FFmpegMediaDecoder::inputfile()
 {
-    char file[1024]={0};
-
-    if(pFormatCtx&&pFormatCtx->url)
-        return pFormatCtx->url;
-
-    return file;
+    return mInputUrl;
 }
 
 enum FFmpegMediaDecoder::Status FFmpegMediaDecoder::status()

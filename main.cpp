@@ -7,6 +7,7 @@
 #include "encoder/FFmpegAudioMerger.h"
 #include "encoder/FFmpegH264Video.h"
 #include "decoder/m3u8parsing.h"
+#include "tools/FFmpegInfo.h"
 //#include "vld.h"
 
 void _ffmpeg_codec(std::string outfile, std::string *out_fmt, enum AVCodecID *out_codec)
@@ -118,9 +119,14 @@ int main(int argc, char *argv[])
 //    FFmpegFileMerger merger;
 //    merger.test2();
 
+    FFmpegInfo info;
+    info.read_av_info("D:\\test\\webm\\00000000514000000.mp4");
+
     FFmpegH264Video h264video;
-    h264video.h264_avc1("D:\\test\\webm\\1112223334445556667778881_1656466868.mp4",
-                   "D:\\test\\webm\\sssssssssssss.mp4");
+    h264video.h264_avc1("D:\\test\\webm\\475FEAB4-A174-427a-8FC3-E59E3B8650731_1657108852_orig.mp4",
+                   "D:\\test\\webm\\ffff.mp4", true);
+
+    info.read_av_info("D:\\test\\webm\\ffff.mp4");
 
     MainWindow w;
     w.show();

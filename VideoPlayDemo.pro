@@ -92,6 +92,7 @@ SOURCES += \
     driver/MediaDecoder.cpp \
     common/RepeatableThread.cpp \
     common/ring_buffer.c \
+    tools/FFmpegInfo.cpp \
     webstreamdialog.cpp
 
 HEADERS += \
@@ -138,6 +139,7 @@ HEADERS += \
     common/RepeatableThread.h \
     common/ring_buffer.h \
     common/ffmpeg_commons.h \
+    tools/FFmpegInfo.h \
     webstreamdialog.h
 
 FORMS += \

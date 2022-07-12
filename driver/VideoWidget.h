@@ -45,6 +45,12 @@ private:
     int mSourceId;
     QList<QSize> sizeList;
 
+    bool m_is_m_rgb24_updated;
+    QImage m_rgb24_image;
+
+protected:
+    void paintEvent(QPaintEvent *event) override;
+
 signals:
 
 public slots:

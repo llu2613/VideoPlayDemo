@@ -1,10 +1,14 @@
 #include "FFmpegH264Video.h"
+#include <QDebug>
 
 /*
  * ffmpeg解析MP4封装的avc1编码问题
  * https://blog.csdn.net/FPGATOM/article/details/86694681
 ffmpeg -framerate 24 -i 1112223334445556667778881_1656465104.mp4 -c copy output.mp4
 ffmpeg -i 1112223334445556667778881_1656465104.mp4 -c copy output.mp4
+
+FFmpeg DTS、PTS和时间戳TIME_BASE详解
+https://blog.csdn.net/aiynmimi/article/details/121231246
 */
 
 FFmpegH264Video::FFmpegH264Video()
@@ -16,7 +20,7 @@ FFmpegH264Video::~FFmpegH264Video()
 {
 
 }
-#include <QDebug>
+
 static void _print_averror(const char *name, int err)
 {
     char errbuf[200], message[256];
@@ -49,6 +53,9 @@ int FFmpegH264Video::h264_avc1(const char *filename, const char *out_file,
     memset(frame_cnt, 0, sizeof(frame_cnt));
     memset(packet_last_dts, 0, sizeof(packet_last_dts));
     memset(packet_curr_dts, 0, sizeof(packet_curr_dts));
+    int in_to_out_index[MAX_STREAM];
+    for(int i=0; i<MAX_STREAM;i++)
+        in_to_out_index[i] = -1;
 
     ret = avformat_open_input(&ifmt_ctx, filename, NULL, NULL);
     if (ret < 0) {
@@ -58,7 +65,7 @@ int FFmpegH264Video::h264_avc1(const char *filename, const char *out_file,
 
     ret = avformat_find_stream_info(ifmt_ctx, NULL);
     if (ret < 0) {
-        av_log(NULL, AV_LOG_ERROR, "Cannot find stream information\n");
+        _print_averror("avformat_find_stream_info", ret);
         goto end;
     }
 
@@ -66,17 +73,25 @@ int FFmpegH264Video::h264_avc1(const char *filename, const char *out_file,
 
     ret = avformat_alloc_output_context2(&ofmt_ctx, NULL, NULL, out_file);
     if (ret<0) {
-        av_log(NULL, AV_LOG_ERROR, "Could not create output context\n");
+        _print_averror("avformat_alloc_output_context2", ret);
         goto end;
     }
 
     for (int i = 0; i < ifmt_ctx->nb_streams; i++) {
         AVStream *in_stream = ifmt_ctx->streams[i];
+        AVCodecID in_codec_id = in_stream->codecpar->codec_id;
+
+        if(av_codec_get_tag(ofmt_ctx->oformat->codec_tag, in_codec_id)==0) {
+            av_log(NULL, AV_LOG_WARNING, "ignore stream %d, codec_tag is invalid\n", i);
+            continue;
+        }
+
         AVStream *out_stream = avformat_new_stream(ofmt_ctx, NULL);
         if (!out_stream) {
             av_log(NULL, AV_LOG_ERROR, "Failed allocating output stream\n");
             goto end;
         }
+        in_to_out_index[i] = out_stream->index;
 
         /* if this stream must be remuxed */
         ret = avcodec_parameters_copy(out_stream->codecpar, in_stream->codecpar);
@@ -84,7 +99,16 @@ int FFmpegH264Video::h264_avc1(const char *filename, const char *out_file,
             av_log(NULL, AV_LOG_ERROR, "Copying parameters for stream #%u failed\n", i);
             goto end;
         }
-        out_stream->time_base = in_stream->time_base;
+
+        // fix time base
+        if(in_stream->codecpar->codec_type==AVMEDIA_TYPE_AUDIO) {
+            AVRational time_base = {1, in_stream->codecpar->sample_rate};
+            out_stream->time_base = time_base;
+        } else {
+            out_stream->time_base = in_stream->time_base;
+        }
+
+        //qDebug() <<"#"<<i<<in_stream->time_base.num<<"/"<<in_stream->time_base.den;
 
         // stream filter
         if(in_stream->codecpar->codec_type==AVMEDIA_TYPE_VIDEO
@@ -112,23 +136,42 @@ int FFmpegH264Video::h264_avc1(const char *filename, const char *out_file,
     /* init muxer, write output file header */
     ret = avformat_write_header(ofmt_ctx, NULL);
     if (ret < 0) {
-        av_log(NULL, AV_LOG_ERROR, "Error occurred when opening output file\n");
+		_print_averror("avformat_write_header", ret);
         goto end;
     }
 
+    int out_stream_index = -1;
+    AVStream *in_stream = NULL;
+    AVStream *out_stream = NULL;
     packet = av_packet_alloc();
     while (1) {
         if ((ret = av_read_frame(ifmt_ctx, packet)) < 0)
             break;
 
         stream_index = packet->stream_index;
-        media_type = ifmt_ctx->streams[stream_index]->codecpar->codec_type;
+        out_stream_index = in_to_out_index[stream_index];
+
+        if(out_stream_index==-1) {
+            av_packet_unref(packet);
+            continue;
+        }
+
+        in_stream = ifmt_ctx->streams[stream_index];
+        out_stream = ofmt_ctx->streams[out_stream_index];
+        media_type = in_stream->codecpar->codec_type;
+
+        //qDebug()<<"#"<<stream_index<<" dts "<<packet->dts<<" pts "<<packet->pts;
 
         if (stream_index >= 0 && stream_index < MAX_STREAM) {
             frame_cnt[stream_index]++;
             packet_curr_dts[stream_index] += packet_last_dts[stream_index]
                     ? (packet->dts)-packet_last_dts[stream_index] : 0;
             packet_last_dts[stream_index] = packet->dts;
+
+            double s = packet_curr_dts[stream_index] * av_q2d(ifmt_ctx->streams[stream_index]->time_base);
+            double s2 = packet_curr_dts[stream_index] * av_q2d(ofmt_ctx->streams[stream_index]->time_base);
+            //qDebug()<<"#"<<stream_index<<" dts "<<packet_curr_dts[stream_index]
+            //          <<" frames "<<frame_cnt[stream_index]<<" dur "<<s<<s2;
         }
 
         if(bsf_ctx_ls[stream_index]) {
@@ -142,6 +185,8 @@ int FFmpegH264Video::h264_avc1(const char *filename, const char *out_file,
                     packet->dts = packet_curr_dts[stream_index];
                     packet->pts = packet_curr_dts[stream_index];
                 }
+                packet->stream_index = out_stream_index;
+                av_packet_rescale_ts(packet, in_stream->time_base, out_stream->time_base);
                 ret = av_interleaved_write_frame(ofmt_ctx, packet);
                 if (ret < 0) {
                     _print_averror("av_interleaved_write_frame", ret);
@@ -149,8 +194,12 @@ int FFmpegH264Video::h264_avc1(const char *filename, const char *out_file,
                 }
             }
         } else {
-            packet->dts = packet_curr_dts[stream_index];
-            packet->pts = packet_curr_dts[stream_index];
+            if(reset_dts) {
+                packet->dts = packet_curr_dts[stream_index];
+                packet->pts = packet_curr_dts[stream_index];
+            }
+            packet->stream_index = out_stream_index;
+            av_packet_rescale_ts(packet, in_stream->time_base, out_stream->time_base);
             ret = av_interleaved_write_frame(ofmt_ctx, packet);
             if (ret < 0) {
                 _print_averror("av_interleaved_write_frame", ret);

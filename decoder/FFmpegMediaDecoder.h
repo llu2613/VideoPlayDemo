@@ -129,7 +129,8 @@ private:
     void print_info(const char* fmt, ...);
     void print_averror(const char *name, int err);
 
-    char mTag[256];
+    char mTag[64];
+    char mInputUrl[256];
     Status mStatus;
     bool mIsHwaccels;
     int64_t lastFrameRealtime;

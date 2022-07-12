@@ -23,6 +23,11 @@ void StreamMediaDecoder::setOutAudio2(int rate, int channels)
     mediaDecoder.setOutAudio(fmt, rate, channels);
 }
 
+void StreamMediaDecoder::setOutVideo(enum AVPixelFormat fmt, int width, int height)
+{
+    mediaDecoder.setOutVideo(fmt, width, height);
+}
+
 void StreamMediaDecoder::setOutVideo2(int width, int height)
 {
     enum AVPixelFormat fmt;

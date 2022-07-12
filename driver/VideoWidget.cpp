@@ -5,6 +5,7 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QComboBox>
+#include <QPainter>
 
 #define VIDEO_W 1280
 #define VIDEO_H 720
@@ -18,7 +19,8 @@ VideoWidget::VideoWidget(QWidget *parent)
     setFixedSize(VIDEO_W+80, VIDEO_H+150);
 
     decoder = new StreamMediaDecoder();
-    decoder->setOutVideo2(VIDEO_W, VIDEO_H);
+    decoder->setOutVideo(AV_PIX_FMT_RGB24, 640, 480);
+    //decoder->setOutVideo2(VIDEO_W, VIDEO_H);
 
 //    QObject::connect(decoder, &FFmpegMediaDecoder::audioData,
 //                     &avSyncTimer, &AVSyncTimer::onAudioData);
@@ -188,6 +190,16 @@ void VideoWidget::onVideoData(std::shared_ptr<MediaData> mediaData)
     if(mediaData->pixel_format==AV_PIX_FMT_YUV420P) {
         videoBuffer.addData(mediaData.get());
     } else if(mediaData->pixel_format==AV_PIX_FMT_RGB24) {
+        QImage img = QImage(mediaData->width, mediaData->height, QImage::Format_RGB888);
+        for(int y = 0; y < mediaData->height; ++y) {
+            memcpy(img.scanLine(y), mediaData->data[0]+y*mediaData->linesize[0],
+                    mediaData->linesize[0]);
+        }
+        m_rgb24_image = img;
+        m_is_m_rgb24_updated = true;
+        update();
+
+
 //      {
 //          QFile file("D:\\1.jpg");
 //          if(file.open(QIODevice::ReadOnly)){
@@ -210,7 +222,7 @@ void VideoWidget::onVideoData(std::shared_ptr<MediaData> mediaData)
 //                file.close();
 //            }
 //        }
-        qDebug()<<"Unsupported video format:"<<mediaData->pixel_format;
+        //qDebug()<<"Unsupported video format:"<<mediaData->pixel_format;
     }
 }
 
@@ -220,4 +232,27 @@ void VideoWidget::onAudioCardOpened(QString name, int cardId)
     if(cardId==CardId) {
         smtAudioPlayer->setCardVolume(CardId, 20);
     }
+}
+
+void VideoWidget::paintEvent(QPaintEvent *event)
+{
+    QPainter painter(this);
+    painter.setBrush(Qt::black);
+    painter.drawRect(0, 0, this->width(), this->height());
+
+    if (m_rgb24_image.size().width() <= 0
+            || !m_is_m_rgb24_updated)
+        return;
+    m_is_m_rgb24_updated = false;
+
+    //比例缩放
+    QImage img = m_rgb24_image.scaled(this->size(),Qt::KeepAspectRatio);
+    int x = this->width() - img.width();
+    int y = this->height() - img.height();
+
+    x /= 2;
+    y /= 2;
+
+    //QPoint(x,y)为中心绘制图像
+    painter.drawImage(QPoint(x,y),img);
 }

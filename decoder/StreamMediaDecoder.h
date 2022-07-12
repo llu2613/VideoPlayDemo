@@ -18,6 +18,7 @@ public:
     explicit StreamMediaDecoder(QObject *parent = nullptr);
     ~StreamMediaDecoder();
 
+    void setOutVideo(enum AVPixelFormat fmt, int width, int height);
     void setOutAudio2(int rate, int channels);
     void setOutVideo2(int width, int height);
     std::shared_ptr<AVSynchronizer> &getSynchronizer();
