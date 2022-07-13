@@ -19,7 +19,7 @@ VideoWidget::VideoWidget(QWidget *parent)
     setFixedSize(VIDEO_W+80, VIDEO_H+150);
 
     decoder = new StreamMediaDecoder();
-    decoder->setOutVideo(AV_PIX_FMT_RGB24, 640, 480);
+    decoder->setOutVideo(AV_PIX_FMT_YUV420P, 640, 480);
     //decoder->setOutVideo2(VIDEO_W, VIDEO_H);
 
 //    QObject::connect(decoder, &FFmpegMediaDecoder::audioData,
@@ -46,6 +46,7 @@ VideoWidget::VideoWidget(QWidget *parent)
     sizeList<<QSize(1920,1080)<<QSize(1280,720)<<QSize(640,480)
            <<QSize(832,480)<<QSize(416,240)
           <<QSize(352,288)<<QSize(175,144);
+    fmtList<<AV_PIX_FMT_YUV420P<<AV_PIX_FMT_RGB24;
 
     // Set core profile
     QSurfaceFormat format = QSurfaceFormat::defaultFormat();
@@ -68,28 +69,36 @@ VideoWidget::VideoWidget(QWidget *parent)
     QPushButton *openBtn = new QPushButton("Open It", this);
     QPushButton *closeBtn = new QPushButton("Stop", this);
     QComboBox *sizeBox = new QComboBox(this);
-
-    for(int i=0; i<sizeList.size(); i++){
+    for(int i=0; i<sizeList.size(); i++) {
         sizeBox->addItem(QString("%1x%2").arg(sizeList[i].width())
                      .arg(sizeList[i].height()));
     }
+    QComboBox *fmtBox = new QComboBox(this);
+    for(int i=0; i<fmtList.size(); i++) {
+        if(fmtList[i]==AV_PIX_FMT_YUV420P)
+            fmtBox->addItem("YUV420P");
+        else if(fmtList[i]==AV_PIX_FMT_RGB24)
+            fmtBox->addItem("RGB24");
+    }
+
 
 //    inputUrl->setText("http://220.161.87.62:8800/hls/0/index.m3u8");
-//    inputUrl->setText("http://192.168.31.233:9080/m3u8file/A02C237E-E644-41E5-B90F-5E6C7AB616CF1885.m3u8");
+    inputUrl->setText("rtsp://192.168.1.100/forward");
 //    inputUrl->setText("http://192.168.31.233:9000/devrecorda02c237ee64441e5b90f5e6c7ab616cf1/19700101084735036-1-3-A02C237E-E644-41E5-B90F-5E6C7AB616CF-0100811318.ts");
 //    inputUrl->setText("rtsp://admin:abc123456@192.168.1.165:554/h264/ch1/main/av_stream");
-    inputUrl->setText("rtsp://192.168.1.151/audiotracker_1");
+//    inputUrl->setText("rtsp://192.168.1.151/audiotracker_1");
     pHLayout->addWidget(inputUrl);
     pHLayout->addWidget(openBtn);
     pHLayout->addWidget(closeBtn);
     pHLayout->addWidget(sizeBox);
+    pHLayout->addWidget(fmtBox);
     pVLayout->addLayout(pHLayout);
 
     connect(openBtn, &QPushButton::clicked, [this,inputUrl](){
         QString url = inputUrl->text();
         if(url.length()) {
 //            decoder->stopPlay();
-            decoder->startPlay(url, true);
+            decoder->startPlay(url, false);
         }
     });
     connect(closeBtn, &QPushButton::clicked, [this](){
@@ -101,6 +110,11 @@ VideoWidget::VideoWidget(QWidget *parent)
             [this](int index){
         QSize size = sizeList[index];
         video->setFixedSize(size);
+    });
+    connect(fmtBox, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
+            [this](int index){
+        AVPixelFormat fmt = fmtList[index];
+        decoder->setOutVideo(fmt, 640, 480);
     });
 
     smtAudioPlayer = SmtAudioPlayer::inst();

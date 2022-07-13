@@ -17,9 +17,6 @@ public:
     explicit FFmpegSwresample();
     ~FFmpegSwresample();
 
-    int init(AVCodecContext *pCodeCtx,
-             enum AVSampleFormat out_fmt,
-             int out_rate, uint64_t out_ch_layout);
     int init(enum AVSampleFormat in_fmt, int in_rate, uint64_t in_ch_layout,
              enum AVSampleFormat out_fmt, int out_rate, uint64_t out_ch_layout);
 

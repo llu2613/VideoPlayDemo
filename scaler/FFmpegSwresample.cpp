@@ -15,16 +15,6 @@ FFmpegSwresample::~FFmpegSwresample()
         avformat_free_context(ctx);
 }
 
-int FFmpegSwresample::init(AVCodecContext *pCodeCtx,
-                            enum AVSampleFormat out_fmt,
-                            int out_rate, uint64_t out_ch_layout)
-{
-    return init(pCodeCtx->sample_fmt,
-                pCodeCtx->sample_rate,
-                pCodeCtx->channels?av_get_default_channel_layout(pCodeCtx->channels):pCodeCtx->channel_layout,
-                out_fmt, out_rate, out_ch_layout);
-}
-
 int FFmpegSwresample::init(enum AVSampleFormat in_fmt, int in_rate, uint64_t in_ch_layout,
                            enum AVSampleFormat out_fmt, int out_rate, uint64_t out_ch_layout)
 {

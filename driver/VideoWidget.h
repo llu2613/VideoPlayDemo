@@ -44,6 +44,7 @@ private:
 
     int mSourceId;
     QList<QSize> sizeList;
+    QList<AVPixelFormat> fmtList;
 
     bool m_is_m_rgb24_updated;
     QImage m_rgb24_image;

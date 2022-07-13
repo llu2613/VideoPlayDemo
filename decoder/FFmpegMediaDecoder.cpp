@@ -126,24 +126,12 @@ void FFmpegMediaDecoder::getOutVideoParams(enum AVPixelFormat *fmt,
 
 void FFmpegMediaDecoder::setOutAudio(enum AVSampleFormat fmt, int rate, int channels)
 {
-    if(pAudioCodecCtx && scaler.isAudioReady()) {
-        scaler.freeAudioResample();
-        scaler.setOutAudio(fmt, rate, channels);
-        scaler.initAudioResample(pAudioCodecCtx);
-    } else {
-        scaler.setOutAudio(fmt, rate, channels);
-    }
+    scaler.setOutAudio(fmt, rate, channels);
 }
 
 void FFmpegMediaDecoder::setOutVideo(enum AVPixelFormat fmt, int width, int height)
 {
-    if(pVideoCodecCtx && scaler.isVideoReady()) {
-        scaler.freeVideoScale();
-        scaler.setOutVideo(fmt, width, height);
-        scaler.initVideoScale(pVideoCodecCtx);
-    } else {
-        scaler.setOutVideo(fmt, width, height);
-    }
+    scaler.setOutVideo(fmt, width, height);
 }
 
 int FFmpegMediaDecoder::audioRawFrame(AVCodecContext *pCodecCtx, AVFrame *frame, AVPacket *packet)
@@ -293,8 +281,10 @@ void FFmpegMediaDecoder::videoDecodedData(AVFrame *frame, AVPacket *packet, int 
     }
 	
 	out_frame = scaler.videoScale(pixelHeight, frame, &out_height);
+    out_frame->format = scaler.outVideoFmt();
+    out_frame->width = scaler.outVideoWidth();
+    out_frame->height = scaler.outVideoHeight();
 
-    
 //    AVFrame *pFrameYUV = out_frame;
 //        if(fp_yuv) {
 //            //输出到YUV文件
@@ -374,11 +364,13 @@ void FFmpegMediaDecoder::fillPixelRGB24(MediaData *mediaData, AVFrame *frame,
 {
 //    fwrite(pFrameYUV->data[0],(pCodecCtx->width)*(pCodecCtx->height)*3,1,output);
 
-    int frameSize = av_image_get_buffer_size(AV_PIX_FMT_RGB24, pixelWidth, pixelHeight, 1);
-    mediaData->data[0] = new unsigned char[frameSize];
-    mediaData->datasize[0] = frameSize;
+    int num_bytes = av_image_get_buffer_size(AV_PIX_FMT_RGB24, pixelWidth, pixelHeight, 1);
+    mediaData->data[0] = new uint8_t[num_bytes];
+    mediaData->datasize[0] = num_bytes;
     mediaData->linesize[0] = frame->linesize[0];
-    memcpy(mediaData->data[0], frame->data[0], frameSize);
+    mediaData->linesize[1] = frame->linesize[1];
+    mediaData->linesize[2] = frame->linesize[2];
+    memcpy(mediaData->data[0], frame->data[0], num_bytes);
 }
 
 void FFmpegMediaDecoder::fillPixelYUV420P(MediaData *mediaData, AVFrame *frame,
@@ -391,7 +383,7 @@ void FFmpegMediaDecoder::fillPixelYUV420P(MediaData *mediaData, AVFrame *frame,
     int y_size = pixelWidth * pixelHeight;
     int dataSize[] = {y_size, y_size / 4, y_size / 4};
     for(int i=0; i<3; i++) {
-        mediaData->data[i] = new unsigned char[dataSize[i]];
+        mediaData->data[i] = new uint8_t[dataSize[i]];
         mediaData->datasize[i] = dataSize[i];
         mediaData->linesize[i] = frame->linesize[i];
         memcpy(mediaData->data[i], frame->data[i], dataSize[i]);

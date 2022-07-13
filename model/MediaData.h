@@ -15,7 +15,7 @@ public:
 
     void copy(const MediaData &src);
 
-    unsigned char *data[MAX_DATA_ARRAY];
+    uint8_t *data[MAX_DATA_ARRAY];
     int datasize[MAX_DATA_ARRAY];
     int linesize[MAX_DATA_ARRAY];
 

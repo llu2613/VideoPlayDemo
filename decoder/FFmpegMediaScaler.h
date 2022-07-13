@@ -41,13 +41,21 @@ public:
     bool isVideoReady();
 
     int initAudioResample(AVCodecContext *pCodeCtx);
-    int initAudioResample(enum AVSampleFormat in_fmt,
+    int initAudioResample(enum AVSampleFormat in_sample_fmt,
                           int in_rate, int in_channels,
-                          enum AVSampleFormat out_fmt,
+                          enum AVSampleFormat out_sample_fmt,
                           int out_rate, int out_channels);
+    int initAudioResample2(enum AVSampleFormat in_sample_fmt,
+                          int in_rate, uint64_t in_ch_layout,
+                          enum AVSampleFormat out_sample_fmt,
+                          int out_rate, uint64_t out_ch_layout);
 
     int initVideoScale(AVCodecContext *pCodeCtx);
     int initVideoScale(enum AVPixelFormat in_pixel_fmt, int in_width, int in_height);
+    int initVideoScale2(enum AVPixelFormat in_pixel_fmt,
+                        int in_width, int in_height,
+                        enum AVPixelFormat out_pixel_fmt,
+                        int out_width, int out_height);
 
     void freeAudioResample();
 
@@ -65,13 +73,13 @@ protected:
 
 private:
     //音频输出格式
-    enum AVSampleFormat out_audio_fmt;
-    int out_audio_rate;
-    int out_audio_ch;
+    enum AVSampleFormat dst_audio_fmt, _src_audio_fmt, _dst_audio_fmt;
+    int dst_audio_rate, _src_audio_rate, _dst_audio_rate;
+    uint64_t dst_audio_chly, _src_audio_chly, _dst_audio_chly;
     //视频输出格式
-    int out_video_width;
-    int out_video_height;
-    enum AVPixelFormat out_video_fmt;
+    int dst_video_width, _src_video_width, _dst_video_width;
+    int dst_video_height, _src_video_height, _dst_video_height;
+    enum AVPixelFormat dst_video_fmt, _src_video_fmt, _dst_video_fmt;
     //音频重采样
     FFmpegSwresample *pAudioResamle;
     uint8_t *pAudioOutBuffer;

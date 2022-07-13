@@ -100,7 +100,18 @@ void StreamMediaDecoder::run()
 
     AVDictionary* options = NULL;
 //    av_dict_set(&options, "rtsp_transport", "tcp", 0);
-    retCode = mediaDecoder.open(url, options, mIsHwaccels);
+    /////////////////////
+    AVDictionary *avdic = NULL;
+    av_dict_set(&avdic, "stimeout", "3000000", 0);//6秒 microseconds:
+    av_dict_set(&avdic, "rtsp_transport", "tcp", 0);//3秒：//解决H265回放拉流花屏的问题
+    //av_dict_set(&avdic, "rtsp_transport", "udp", 0);
+    av_dict_set(&avdic, "buffer_size", "8388608", 0); //设置udp的接收缓冲 8M
+
+    //av_dict_set(&avdic, "buffer_size", "10240000", 0);//解决H265回放拉流花屏的问题
+    //av_dict_set(&avdic, "threads", "auto", 0);
+    //av_dict_set(&avdic, "refcounted_frames", "1", 0);
+    /////////////////////
+    retCode = mediaDecoder.open(url, avdic, mIsHwaccels);
     bool haveVideo = mediaDecoder.videoStream()?true:false;
     bool haveAudio = mediaDecoder.audioStream()?true:false;
 

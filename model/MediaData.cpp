@@ -65,7 +65,7 @@ void MediaData::copy(const MediaData &src)
             if(data[i]) {
                 delete data[i];
             }
-            data[i] = new unsigned char[src.datasize[i]];
+            data[i] = new uint8_t[src.datasize[i]];
             if(data[i]) {
                 memcpy(data[i], src.data[i], src.datasize[i]);
                 datasize[i] = src.datasize[i];

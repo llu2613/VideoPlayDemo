@@ -27,13 +27,6 @@ int FFmpegSwscale::init(AVCodecContext *pCodecCtx,
 int FFmpegSwscale::init(enum AVPixelFormat in_pixel_fmt, int in_width, int in_height,
                         enum AVPixelFormat out_pixel_fmt, int out_width, int out_height)
 {
-    in_frame_fmt = in_pixel_fmt;
-    in_frame_width = in_width;
-    in_frame_height = in_height;
-    out_frame_fmt = out_pixel_fmt;
-    out_frame_width = out_width;
-    out_frame_height = out_height;
-
     if(swsCtx)
         sws_freeContext(swsCtx);
 
@@ -46,8 +39,14 @@ int FFmpegSwscale::init(enum AVPixelFormat in_pixel_fmt, int in_width, int in_he
     }
 
     //新数据长度
-    //out_count = avpicture_get_size(out_frame_fmt, out_frame_width, out_frame_height);
-    out_count = av_image_get_buffer_size(out_frame_fmt, out_frame_width, out_frame_height, 1);
+    out_count = av_image_get_buffer_size(out_pixel_fmt, out_width, out_height, 1);
+
+    in_frame_fmt = in_pixel_fmt;
+    in_frame_width = in_width;
+    in_frame_height = in_height;
+    out_frame_fmt = out_pixel_fmt;
+    out_frame_width = out_width;
+    out_frame_height = out_height;
 
     return 0;
 }
@@ -56,6 +55,10 @@ int FFmpegSwscale::mallocOutFrame(AVFrame **out_frame, uint8_t **out_buffer, int
 {
     //内存分配
     *out_frame = av_frame_alloc();
+    if(!(*out_frame)) {
+        av_log(ctx, AV_LOG_ERROR, "no memory alloc to out_frame");
+        return -1;
+    }
     //只有指定了AVFrame的像素格式、画面大小才能真正分配内存
     //缓冲区分配内存
     *out_buffer = (uint8_t *)av_malloc(out_count);
@@ -67,10 +70,13 @@ int FFmpegSwscale::mallocOutFrame(AVFrame **out_frame, uint8_t **out_buffer, int
 
     *out_buffer_size = out_count;
     //初始化缓冲区
-    av_image_fill_arrays((*out_frame)->data, (*out_frame)->linesize, *out_buffer,
+    int bytes = av_image_fill_arrays((*out_frame)->data, (*out_frame)->linesize, *out_buffer,
                          out_frame_fmt, out_frame_width, out_frame_height, 1);
 
-    return 0;
+    (*out_frame)->width = out_frame_width;
+    (*out_frame)->height = out_frame_height;
+    (*out_frame)->format = out_frame_fmt;
+    return bytes;
 }
 
 void FFmpegSwscale::freeOutFrame(AVFrame **out_frame, uint8_t **out_buffer, int *out_buffer_size)
