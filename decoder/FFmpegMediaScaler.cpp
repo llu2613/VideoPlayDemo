@@ -106,8 +106,11 @@ void FFmpegMediaScaler::setOutAudio(enum AVSampleFormat fmt, int rate, int chann
     dst_audio_chly = av_get_default_channel_layout(channels);
 
     if(isAudioReady()) {
+        AVSampleFormat src_audio_fmt = _src_audio_fmt;
+        int src_audio_rate = _src_audio_rate;
+        uint64_t src_audio_chly = _src_audio_chly;
         freeAudioResample();
-        initAudioResample2(_src_audio_fmt, _src_audio_rate, _src_audio_chly,
+        initAudioResample2(src_audio_fmt, src_audio_rate, src_audio_chly,
                           dst_audio_fmt, dst_audio_rate, dst_audio_chly);
     }
 }
@@ -121,8 +124,11 @@ void FFmpegMediaScaler::setOutVideo(enum AVPixelFormat fmt, int width, int heigh
     dst_video_fmt = fmt;
 
     if(isAudioReady()) {
+        AVPixelFormat src_video_fmt = _src_video_fmt;
+        int src_video_width = _src_video_width;
+        int src_video_height = _src_video_height;
         freeVideoScale();
-        initVideoScale2(_src_video_fmt, _src_video_width, _src_video_height,
+        initVideoScale2(src_video_fmt, src_video_width, src_video_height,
                           dst_video_fmt, dst_video_width, dst_video_height);
     }
 }

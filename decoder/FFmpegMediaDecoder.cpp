@@ -106,11 +106,11 @@ void FFmpegMediaDecoder::getSrcVideoParams(enum AVPixelFormat *fmt,
                                            int *width, int *height)
 {
     if(fmt)
-        *fmt = scaler.outVideoFmt();
+        *fmt = scaler.srcVideoFmt();
     if(width)
-        *width = scaler.outVideoWidth();
+        *width = scaler.srcVideoWidth();
     if(height)
-        *height = scaler.outVideoHeight();
+        *height = scaler.srcVideoHeight();
 }
 
 void FFmpegMediaDecoder::getOutVideoParams(enum AVPixelFormat *fmt,
@@ -711,6 +711,8 @@ void FFmpegMediaDecoder::close()
 
     scaler.freeAudioResample();
     scaler.freeVideoScale();
+
+    memset(mInputUrl, 0 ,sizeof(mInputUrl));
 
     mStatus = Closed;
 }
