@@ -37,7 +37,7 @@ static void _print_averror(const char *name, int err)
 int FFmpegH264Video::h264_avc1(const char *filename, const char *out_file,
                                bool reset_dts)
 {
-    int ret;
+    int ret, i;
     const int MAX_STREAM = 32;
     AVFormatContext *ifmt_ctx = NULL;
     AVFormatContext *ofmt_ctx = NULL;
@@ -45,8 +45,10 @@ int FFmpegH264Video::h264_avc1(const char *filename, const char *out_file,
     memset(bsf_ctx_ls, 0, sizeof(bsf_ctx_ls));
     AVPacket *packet = NULL;
     AVFrame *frame = NULL;
+    int istream_index = 0;
+    int ostream_index = 0;
     enum AVMediaType media_type;
-    unsigned int stream_index;
+
     int frame_cnt[MAX_STREAM];
     int64_t packet_last_dts[MAX_STREAM];
     int64_t packet_curr_dts[MAX_STREAM];
@@ -54,7 +56,7 @@ int FFmpegH264Video::h264_avc1(const char *filename, const char *out_file,
     memset(packet_last_dts, 0, sizeof(packet_last_dts));
     memset(packet_curr_dts, 0, sizeof(packet_curr_dts));
     int in_to_out_index[MAX_STREAM];
-    for(int i=0; i<MAX_STREAM;i++)
+    for(i=0; i<MAX_STREAM;i++)
         in_to_out_index[i] = -1;
 
     ret = avformat_open_input(&ifmt_ctx, filename, NULL, NULL);
@@ -77,7 +79,7 @@ int FFmpegH264Video::h264_avc1(const char *filename, const char *out_file,
         goto end;
     }
 
-    for (int i = 0; i < ifmt_ctx->nb_streams; i++) {
+    for (i = 0; i < ifmt_ctx->nb_streams; i++) {
         AVStream *in_stream = ifmt_ctx->streams[i];
         AVCodecID in_codec_id = in_stream->codecpar->codec_id;
 
@@ -140,53 +142,49 @@ int FFmpegH264Video::h264_avc1(const char *filename, const char *out_file,
         goto end;
     }
 
-    int out_stream_index = -1;
-    AVStream *in_stream = NULL;
-    AVStream *out_stream = NULL;
     packet = av_packet_alloc();
     while (1) {
         if ((ret = av_read_frame(ifmt_ctx, packet)) < 0)
             break;
 
-        stream_index = packet->stream_index;
-        out_stream_index = in_to_out_index[stream_index];
+        istream_index = packet->stream_index;
+        ostream_index = in_to_out_index[istream_index];
 
-        if(out_stream_index==-1) {
+        if(ostream_index==-1) {
             av_packet_unref(packet);
             continue;
         }
 
-        in_stream = ifmt_ctx->streams[stream_index];
-        out_stream = ofmt_ctx->streams[out_stream_index];
-        media_type = in_stream->codecpar->codec_type;
+        media_type = ifmt_ctx->streams[istream_index]->codecpar->codec_type;
 
         //qDebug()<<"#"<<stream_index<<" dts "<<packet->dts<<" pts "<<packet->pts;
 
-        if (stream_index >= 0 && stream_index < MAX_STREAM) {
-            frame_cnt[stream_index]++;
-            packet_curr_dts[stream_index] += packet_last_dts[stream_index]
-                    ? (packet->dts)-packet_last_dts[stream_index] : 0;
-            packet_last_dts[stream_index] = packet->dts;
+        if (istream_index >= 0 && istream_index < MAX_STREAM) {
+            frame_cnt[istream_index]++;
+            packet_curr_dts[istream_index] += packet_last_dts[istream_index]
+                    ? (packet->dts)-packet_last_dts[istream_index] : 0;
+            packet_last_dts[istream_index] = packet->dts;
 
-            double s = packet_curr_dts[stream_index] * av_q2d(ifmt_ctx->streams[stream_index]->time_base);
-            double s2 = packet_curr_dts[stream_index] * av_q2d(ofmt_ctx->streams[stream_index]->time_base);
+            double s = packet_curr_dts[istream_index] * av_q2d(ifmt_ctx->streams[istream_index]->time_base);
+            double s2 = packet_curr_dts[istream_index] * av_q2d(ofmt_ctx->streams[istream_index]->time_base);
             //qDebug()<<"#"<<stream_index<<" dts "<<packet_curr_dts[stream_index]
             //          <<" frames "<<frame_cnt[stream_index]<<" dur "<<s<<s2;
         }
 
-        if(bsf_ctx_ls[stream_index]) {
+        if(bsf_ctx_ls[istream_index]) {
             //AVPacket处理
-            ret = av_bsf_send_packet(bsf_ctx_ls[stream_index], packet);
+            ret = av_bsf_send_packet(bsf_ctx_ls[istream_index], packet);
             if (ret < 0) {
                 _print_averror("av_bsf_send_packet", ret);
             }
-            while(av_bsf_receive_packet(bsf_ctx_ls[stream_index], packet) == 0) {
+            while(av_bsf_receive_packet(bsf_ctx_ls[istream_index], packet) == 0) {
                 if(reset_dts) {
-                    packet->dts = packet_curr_dts[stream_index];
-                    packet->pts = packet_curr_dts[stream_index];
+                    packet->dts = packet_curr_dts[istream_index];
+                    packet->pts = packet_curr_dts[istream_index];
                 }
-                packet->stream_index = out_stream_index;
-                av_packet_rescale_ts(packet, in_stream->time_base, out_stream->time_base);
+                packet->stream_index = ostream_index;
+                av_packet_rescale_ts(packet, ifmt_ctx->streams[istream_index]->time_base,
+                                     ofmt_ctx->streams[ostream_index]->time_base);
                 ret = av_interleaved_write_frame(ofmt_ctx, packet);
                 if (ret < 0) {
                     _print_averror("av_interleaved_write_frame", ret);
@@ -195,11 +193,12 @@ int FFmpegH264Video::h264_avc1(const char *filename, const char *out_file,
             }
         } else {
             if(reset_dts) {
-                packet->dts = packet_curr_dts[stream_index];
-                packet->pts = packet_curr_dts[stream_index];
+                packet->dts = packet_curr_dts[istream_index];
+                packet->pts = packet_curr_dts[istream_index];
             }
-            packet->stream_index = out_stream_index;
-            av_packet_rescale_ts(packet, in_stream->time_base, out_stream->time_base);
+            packet->stream_index = ostream_index;
+            av_packet_rescale_ts(packet, ifmt_ctx->streams[istream_index]->time_base,
+                                 ofmt_ctx->streams[ostream_index]->time_base);
             ret = av_interleaved_write_frame(ofmt_ctx, packet);
             if (ret < 0) {
                 _print_averror("av_interleaved_write_frame", ret);
@@ -212,7 +211,7 @@ int FFmpegH264Video::h264_avc1(const char *filename, const char *out_file,
     av_write_trailer(ofmt_ctx);
 end:
     //释放：
-    for(int i=0; i<MAX_STREAM; i++) {
+    for(i=0; i<MAX_STREAM; i++) {
         av_bsf_free(&(bsf_ctx_ls[i]));
     }
 
