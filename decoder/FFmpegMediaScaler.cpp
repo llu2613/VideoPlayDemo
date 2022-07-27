@@ -7,6 +7,8 @@ FFmpegMediaScaler::FFmpegMediaScaler()
     pVideoScale = nullptr;
     pVideoOutFrame = nullptr;
     pVideoOutBuffer = nullptr;
+    isAudioOutFrameRef = false;
+    isVideoOutFrameRef = false;
 
     dst_audio_fmt = AV_SAMPLE_FMT_S16;
     dst_audio_rate = 48000;
@@ -19,16 +21,10 @@ FFmpegMediaScaler::FFmpegMediaScaler()
     _src_audio_fmt = AV_SAMPLE_FMT_NONE;
     _src_audio_rate = 0;
     _src_audio_chly = 0;
-    _dst_audio_fmt = AV_SAMPLE_FMT_NONE;
-    _dst_audio_rate = 0;
-    _dst_audio_chly = 0;
 
     _src_video_fmt = AV_PIX_FMT_NONE;
     _src_video_width = 0;
     _src_video_height = 0;
-    _dst_video_fmt = AV_PIX_FMT_NONE;
-    _dst_video_width = 0;
-    _dst_video_height = 0;
 }
 
 FFmpegMediaScaler::~FFmpegMediaScaler()
@@ -54,17 +50,17 @@ int FFmpegMediaScaler::srcAudioChannels()
 
 enum AVSampleFormat FFmpegMediaScaler::outAudioFmt()
 {
-    return _dst_audio_fmt;
+    return dst_audio_fmt;
 }
 
 int FFmpegMediaScaler::outAudioRate()
 {
-    return _dst_audio_rate;
+    return dst_audio_rate;
 }
 
 int FFmpegMediaScaler::outAudioChannels()
 {
-    return av_get_channel_layout_nb_channels(_dst_audio_chly);
+    return av_get_channel_layout_nb_channels(dst_audio_chly);
 }
 
 enum AVPixelFormat FFmpegMediaScaler::srcVideoFmt()
@@ -84,17 +80,17 @@ int FFmpegMediaScaler::srcVideoWidth()
 
 enum AVPixelFormat FFmpegMediaScaler::outVideoFmt()
 {
-    return _dst_video_fmt;
+    return dst_video_fmt;
 }
 
 int FFmpegMediaScaler::outVideoHeight()
 {
-    return _dst_video_height;
+    return dst_video_height;
 }
 
 int FFmpegMediaScaler::outVideoWidth()
 {
-    return _dst_video_width;
+    return dst_video_width;
 }
 
 void FFmpegMediaScaler::setOutAudio(enum AVSampleFormat fmt, int rate, int channels)
@@ -106,11 +102,8 @@ void FFmpegMediaScaler::setOutAudio(enum AVSampleFormat fmt, int rate, int chann
     dst_audio_chly = av_get_default_channel_layout(channels);
 
     if(isAudioReady()) {
-        AVSampleFormat src_audio_fmt = _src_audio_fmt;
-        int src_audio_rate = _src_audio_rate;
-        uint64_t src_audio_chly = _src_audio_chly;
         freeAudioResample();
-        initAudioResample2(src_audio_fmt, src_audio_rate, src_audio_chly,
+        initAudioResample2(_src_audio_fmt, _src_audio_rate, _src_audio_chly,
                           dst_audio_fmt, dst_audio_rate, dst_audio_chly);
     }
 }
@@ -123,12 +116,9 @@ void FFmpegMediaScaler::setOutVideo(enum AVPixelFormat fmt, int width, int heigh
     dst_video_height = height;
     dst_video_fmt = fmt;
 
-    if(isAudioReady()) {
-        AVPixelFormat src_video_fmt = _src_video_fmt;
-        int src_video_width = _src_video_width;
-        int src_video_height = _src_video_height;
+    if(isVideoReady()) {
         freeVideoScale();
-        initVideoScale2(src_video_fmt, src_video_width, src_video_height,
+        initVideoScale2(_src_video_fmt, _src_video_width, _src_video_height,
                           dst_video_fmt, dst_video_width, dst_video_height);
     }
 }
@@ -181,6 +171,7 @@ int FFmpegMediaScaler::initAudioResample2(enum AVSampleFormat in_sample_fmt,
         delete p;
         return -1;
     }
+
     ret = p->mallocOutBuffer(&pAudioOutBuffer, &audioOutBufferSize);
     if(ret<0) {
         printError(-1, "申请内存失败");
@@ -197,9 +188,6 @@ int FFmpegMediaScaler::initAudioResample2(enum AVSampleFormat in_sample_fmt,
     _src_audio_fmt = in_sample_fmt;
     _src_audio_rate = in_rate;
     _src_audio_chly = in_ch_layout;
-    _dst_audio_fmt = out_sample_fmt;
-    _dst_audio_rate = out_rate;
-    _dst_audio_chly = out_ch_layout;
 
     return 0;
 }
@@ -251,9 +239,6 @@ int FFmpegMediaScaler::initVideoScale2(enum AVPixelFormat in_pixel_fmt,
     _src_video_fmt = in_pixel_fmt;
     _src_video_width = in_width;
     _src_video_height = in_height;
-    _dst_video_fmt = out_pixel_fmt;
-    _dst_video_width = out_width;
-    _dst_video_height = out_height;
 
     return 0;
 }
@@ -300,6 +285,7 @@ uint8_t * FFmpegMediaScaler::audioConvert(const uint8_t **in_buffer, int nb_samp
     if(out_samples) {
         *out_sp = out_samples;
         *out_sz = out_buffer_size;
+        isAudioOutFrameRef = true;
         return pAudioOutBuffer;
     }
     return nullptr;
@@ -307,25 +293,8 @@ uint8_t * FFmpegMediaScaler::audioConvert(const uint8_t **in_buffer, int nb_samp
 
 uint8_t * FFmpegMediaScaler::audioConvert(AVFrame *frame, int *out_sp, int *out_sz)
 {
-    std::lock_guard<std::recursive_mutex> lk(audioMutex);
-
-    if(!pAudioResamle) {
-        printError(-1, "pAudioResamle is null");
-        return nullptr;
-    }
-
-    int out_samples = pAudioResamle->convert(frame, &pAudioOutBuffer, audioOutBufferSize);
-    //获取sample的size
-    int out_channels = av_get_channel_layout_nb_channels(pAudioResamle->outChannelLayout());
-    int out_buffer_size = av_samples_get_buffer_size(NULL, out_channels, out_samples,
-            pAudioResamle->outSampleFmt(), 1);
-
-    if(out_samples) {
-        *out_sp = out_samples;
-        *out_sz = out_buffer_size;
-        return pAudioOutBuffer;
-    }
-    return nullptr;
+    const uint8_t **data = const_cast<const uint8_t **>(frame->data);
+    return audioConvert(data, frame->nb_samples, out_sp, out_sz);
 }
 
 AVFrame* FFmpegMediaScaler::videoScale(int pixelHeight, AVFrame *frame, int *out_h)
@@ -341,6 +310,10 @@ AVFrame* FFmpegMediaScaler::videoScale(int pixelHeight, AVFrame *frame, int *out
 
     if(out_height) {
         *out_h = out_height;
+        pVideoOutFrame->format = pVideoScale->outFormat();
+        pVideoOutFrame->width = pVideoScale->outWidth();
+        pVideoOutFrame->height = pVideoScale->outHeight();
+        isVideoOutFrameRef = true;
         return pVideoOutFrame;
     }
     return nullptr;

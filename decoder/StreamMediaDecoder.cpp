@@ -7,8 +7,6 @@ StreamMediaDecoder::StreamMediaDecoder(QObject *parent)
     //TEST
     fp_pcm = 0;
     fp_yuv = 0;
-
-    mediaDecoder.setCallback(this);
 }
 
 StreamMediaDecoder::~StreamMediaDecoder()
@@ -19,20 +17,27 @@ StreamMediaDecoder::~StreamMediaDecoder()
 void StreamMediaDecoder::setOutAudio2(int rate, int channels)
 {
     enum AVSampleFormat fmt;
-    mediaDecoder.getOutAudioParams(&fmt, NULL, NULL);
-    mediaDecoder.setOutAudio(fmt, rate, channels);
+    getOutAudioParams(&fmt, NULL, NULL);
+    setOutAudio(fmt, rate, channels);
+}
+
+void StreamMediaDecoder::setOutVideoFmt(enum AVPixelFormat fmt)
+{
+    int width, height;
+    getOutVideoParams(NULL, &width, &height);
+    setOutVideo(fmt, width, height);
 }
 
 void StreamMediaDecoder::setOutVideo(enum AVPixelFormat fmt, int width, int height)
 {
-    mediaDecoder.setOutVideo(fmt, width, height);
+    FFmpegMediaDecoder::setOutVideo(fmt, width, height);
 }
 
 void StreamMediaDecoder::setOutVideo2(int width, int height)
 {
     enum AVPixelFormat fmt;
-    mediaDecoder.getOutVideoParams(&fmt, NULL, NULL);
-    mediaDecoder.setOutVideo(fmt, width, height);
+    getOutVideoParams(&fmt, NULL, NULL);
+    setOutVideo(fmt, width, height);
 }
 
 std::shared_ptr<AVSynchronizer> &StreamMediaDecoder::getSynchronizer()
@@ -60,7 +65,17 @@ void StreamMediaDecoder::onDecodeError(int code, std::string msg)
     qDebug()<<"onDecodeError"<<QString::number(code)<<QString::fromStdString(msg);
 }
 
-void StreamMediaDecoder::onAudioDataReady(std::shared_ptr<MediaData> data)
+void StreamMediaDecoder::audioDecodedData(AVFrame *frame, AVPacket *packet)
+{
+    FFmpegMediaDecoder::audioDecodedData(frame, packet);
+}
+
+void StreamMediaDecoder::videoDecodedData(AVFrame *frame, AVPacket *packet, int pixelHeight)
+{
+    FFmpegMediaDecoder::videoDecodedData(frame, packet, pixelHeight);
+}
+
+void StreamMediaDecoder::audioDataReady(std::shared_ptr<MediaData> data)
 {
     audio_ts = data->pts;
     syncer->setAudioTimeBaseD(data->time_base_d);
@@ -69,12 +84,12 @@ void StreamMediaDecoder::onAudioDataReady(std::shared_ptr<MediaData> data)
     emit audioData(data);
 }
 
-void StreamMediaDecoder::onVideoDataReady(std::shared_ptr<MediaData> data)
+void StreamMediaDecoder::videoDataReady(std::shared_ptr<MediaData> data)
 {
     video_ts = data->pts;
     syncer->setVideoTimeBaseD(data->time_base_d);
     syncer->setVideoDecodingTs(data->pts);
-
+	qDebug() << "----videoDataReady----"<< data->pixel_format<<data->width<< data->height;
     emit videoData(data);
 }
 
@@ -111,9 +126,16 @@ void StreamMediaDecoder::run()
     //av_dict_set(&avdic, "threads", "auto", 0);
     //av_dict_set(&avdic, "refcounted_frames", "1", 0);
     /////////////////////
-    retCode = mediaDecoder.open(url, avdic, mIsHwaccels);
-    bool haveVideo = mediaDecoder.videoStream()?true:false;
-    bool haveAudio = mediaDecoder.audioStream()?true:false;
+    retCode = open(url, avdic, mIsHwaccels);
+    bool haveVideo = videoStream()?true:false;
+    bool haveAudio = audioStream()?true:false;
+
+	if (retCode >= 0 && haveVideo) {
+		enum AVPixelFormat fmt;
+		int width, height;
+		getSrcVideoParams(&fmt, &width, &height);
+		setOutVideo2(width, height);
+	}
 
     bool isDecoding = true;
     syncer->resetOsTime();
@@ -130,9 +152,9 @@ void StreamMediaDecoder::run()
             isDecoding = false;
         mStopMutex.unlock();
 
-        retCode = mediaDecoder.decoding();
+        retCode = decoding();
         if(retCode<0) {
-            qDebug()<<"----decode-failure----"<<mediaDecoder.status();
+            qDebug()<<"----decode-failure----"<<status();
             break;
         }
 
@@ -157,7 +179,7 @@ void StreamMediaDecoder::run()
         }
     }
 
-    mediaDecoder.close();
+    close();
 
     qDebug()<<"----stop-decoding----";
 }
@@ -168,11 +190,11 @@ void StreamMediaDecoder::test()
     fp_yuv = fopen("D:\\test\\out.yuv", "wb");
 
     qDebug()<<"------------------open-------------------";
-    mediaDecoder.open("http://ivi.bupt.edu.cn/hls/cctv1hd.m3u8", true);
+    open("http://ivi.bupt.edu.cn/hls/cctv1hd.m3u8", true);
     qDebug()<<"------------------decoding-------------------";
-    mediaDecoder.decoding();
+    decoding();
     qDebug()<<"------------------close-------------------";
-    mediaDecoder.close();
+    close();
     qDebug()<<"------------------end-------------------";
 
     fclose(fp_pcm);

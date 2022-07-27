@@ -29,11 +29,11 @@ public:
 
     int scale(AVFrame *pFrame, int srcSliceH, AVFrame *pOutFrame);
 
-    enum AVPixelFormat inPixelFmt();
+    enum AVPixelFormat inFormat();
     int inHeight();
     int inWidth();
 
-    enum AVPixelFormat outPixelFmt();
+    enum AVPixelFormat outFormat();
     int outHeight();
     int outWidth();
 

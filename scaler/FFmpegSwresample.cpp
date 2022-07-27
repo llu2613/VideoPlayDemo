@@ -68,6 +68,48 @@ void FFmpegSwresample::freeOutBuffer(uint8_t **out_buffer, int *out_buffer_size)
     }
 }
 
+int FFmpegSwresample::mallocOutFrame(AVFrame **out_frame, uint8_t **out_buffer, int *out_buffer_size)
+{
+    /*
+     * FFmpeg连载6-音频重采样
+     * https://blog.csdn.net/u012944685/article/details/124395001
+    */
+    // 进行音频重采样
+    int src_nb_samples = 0;//avFrame->nb_samples;
+    // 为了保持从采样后 dst_nb_samples / dest_sample = src_nb_sample / src_sample_rate
+    int64_t max_dst_nb_samples = av_rescale_rnd(src_nb_samples, out_sample_rate, in_sample_rate, AV_ROUND_UP);
+    // 从采样器中会缓存一部分，获取缓存的长度
+    int64_t delay = swr_get_delay(swrCtx, in_sample_rate);
+    int64_t dst_nb_samples = av_rescale_rnd(delay + src_nb_samples, out_sample_rate, in_sample_rate, AV_ROUND_UP);
+
+    av_frame_free(out_frame);
+    (*out_frame) = av_frame_alloc();
+    (*out_frame)->sample_rate = out_sample_rate;
+    (*out_frame)->format = out_sample_fmt;
+    (*out_frame)->channel_layout = out_channel_layout;
+    (*out_frame)->nb_samples = dst_nb_samples;
+    // 分配buffer
+    av_frame_get_buffer(*out_frame, 0);
+    av_frame_make_writable(*out_frame);
+
+    if(nullptr == out_frame){
+        //init_out_frame(dst_nb_samples);
+    }
+
+    if (dst_nb_samples > max_dst_nb_samples) {
+        // 需要重新分配buffer
+        //std::cout << "需要重新分配buffer" << std::endl;
+        //init_out_frame(dst_nb_samples);
+        max_dst_nb_samples = dst_nb_samples;
+    }
+    return 0;
+}
+
+void FFmpegSwresample::freeOutFrame(AVFrame **out_frame, uint8_t **out_buffer, int *out_buffer_size)
+{
+
+}
+
 int FFmpegSwresample::convert(AVFrame *frame, uint8_t **out_buffer, int out_buffer_size)
 {
     return convert((const uint8_t **)frame->data, frame->nb_samples,

@@ -2,6 +2,7 @@
 #define FFMPEGMEDIASCALER_H
 
 #include <mutex>
+#include <memory>
 #include "../scaler/FFmpegSwresample.h"
 #include "../scaler/FFmpegSwscale.h"
 #include "model/MediaData.h"
@@ -73,22 +74,25 @@ protected:
 
 private:
     //音频输出格式
-    enum AVSampleFormat dst_audio_fmt, _src_audio_fmt, _dst_audio_fmt;
-    int dst_audio_rate, _src_audio_rate, _dst_audio_rate;
-    uint64_t dst_audio_chly, _src_audio_chly, _dst_audio_chly;
+    enum AVSampleFormat dst_audio_fmt, _src_audio_fmt;
+    int dst_audio_rate, _src_audio_rate;
+    uint64_t dst_audio_chly, _src_audio_chly;
     //视频输出格式
-    int dst_video_width, _src_video_width, _dst_video_width;
-    int dst_video_height, _src_video_height, _dst_video_height;
-    enum AVPixelFormat dst_video_fmt, _src_video_fmt, _dst_video_fmt;
+    int dst_video_width, _src_video_width;
+    int dst_video_height, _src_video_height;
+    enum AVPixelFormat dst_video_fmt, _src_video_fmt;
     //音频重采样
     FFmpegSwresample *pAudioResamle;
+    AVFrame *pAudioOutFrame;
     uint8_t *pAudioOutBuffer;
     int audioOutBufferSize;
+    bool isAudioOutFrameRef;
     //视频缩放
     FFmpegSwscale *pVideoScale;
     AVFrame *pVideoOutFrame;
     uint8_t *pVideoOutBuffer;
     int videoOutBufferSize;
+    bool isVideoOutFrameRef;
 
     std::recursive_mutex audioMutex, videoMutex;
 

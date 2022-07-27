@@ -83,12 +83,15 @@ FFmpegMediaDecoder::~FFmpegMediaDecoder()
 void FFmpegMediaDecoder::getSrcAudioParams(enum AVSampleFormat *fmt,
                                            int *rate, int *channels)
 {
+    const AVCodecContext* codec = audioCodecContext();
+
     if(fmt)
-        *fmt = scaler.srcAudioFmt();
+        *fmt = codec? codec->sample_fmt: AV_SAMPLE_FMT_NONE;
     if(rate)
-        *rate = scaler.srcAudioRate();
+        *rate = codec? codec->sample_rate: 0;
     if(channels)
-        *channels = scaler.srcAudioChannels();
+        *channels = codec?
+                (codec->channels?codec->channels:av_get_channel_layout_nb_channels(codec->channel_layout)): 0;
 }
 
 void FFmpegMediaDecoder::getOutAudioParams(enum AVSampleFormat *fmt,
@@ -105,12 +108,14 @@ void FFmpegMediaDecoder::getOutAudioParams(enum AVSampleFormat *fmt,
 void FFmpegMediaDecoder::getSrcVideoParams(enum AVPixelFormat *fmt,
                                            int *width, int *height)
 {
+    const AVCodecContext* codec = videoCodecContext();
+
     if(fmt)
-        *fmt = scaler.srcVideoFmt();
+        *fmt = codec? codec->pix_fmt: AV_PIX_FMT_NONE;
     if(width)
-        *width = scaler.srcVideoWidth();
+        *width = codec? codec->width: 0;
     if(height)
-        *height = scaler.srcVideoHeight();
+        *height = codec? codec->height: 0;
 }
 
 void FFmpegMediaDecoder::getOutVideoParams(enum AVPixelFormat *fmt,
@@ -259,8 +264,9 @@ void FFmpegMediaDecoder::audioDecodedData(AVFrame *frame, AVPacket *packet)
 //        if(fp_pcm) {
 //            fwrite(pAudioOutBuffer, 1, out_buffer_size, fp_pcm);
 //        }
-
-    audioResampledData(packet, pAudioOutBuffer, out_buffer_size, out_samples);
+    if(pAudioOutBuffer) {
+        audioResampledData(packet, pAudioOutBuffer, out_buffer_size, out_samples);
+    }
 }
 
 void FFmpegMediaDecoder::videoDecodedData(AVFrame *frame, AVPacket *packet, int pixelHeight)
@@ -281,10 +287,7 @@ void FFmpegMediaDecoder::videoDecodedData(AVFrame *frame, AVPacket *packet, int 
     }
 	
 	out_frame = scaler.videoScale(pixelHeight, frame, &out_height);
-    out_frame->format = scaler.outVideoFmt();
-    out_frame->width = scaler.outVideoWidth();
-    out_frame->height = scaler.outVideoHeight();
-
+    
 //    AVFrame *pFrameYUV = out_frame;
 //        if(fp_yuv) {
 //            //输出到YUV文件
@@ -297,8 +300,10 @@ void FFmpegMediaDecoder::videoDecodedData(AVFrame *frame, AVPacket *packet, int 
 //            fwrite(pFrameYUV->data[1], 1, y_size / 4, fp_yuv);
 //            fwrite(pFrameYUV->data[2], 1, y_size / 4, fp_yuv);
 //        }
-	if(out_frame)
+
+	if (out_frame) {
 		videoScaledData(out_frame, packet, out_height);
+	}
 }
 
 void FFmpegMediaDecoder::audioResampledData(AVPacket *packet, uint8_t *sampleBuffer,
@@ -329,8 +334,8 @@ void FFmpegMediaDecoder::videoScaledData(AVFrame *frame, AVPacket *packet, int p
 {
     try {
         std::shared_ptr<MediaData> mediaData(new MediaData);
-        mediaData->pixel_format = scaler.outVideoFmt();
-        mediaData->width = scaler.outVideoWidth();
+        mediaData->pixel_format = frame->format;
+        mediaData->width = frame->width;
         mediaData->height = pixelHeight;
         mediaData->pts = video_pts;
         video_pts += packet->duration;
@@ -344,10 +349,10 @@ void FFmpegMediaDecoder::videoScaledData(AVFrame *frame, AVPacket *packet, int p
         //一帧图像（音频）的时间戳（时间戳一般以第一帧为0开始）
         //时间戳 = pts * (AVRational.num/AVRational.den)
         //int second= pFrame->pts * av_q2d(stream->time_base);
-        if(scaler.outVideoFmt()==AV_PIX_FMT_YUV420P) {
-            fillPixelYUV420P(mediaData.get(), frame, scaler.outVideoWidth(), pixelHeight);
-        } else if(scaler.outVideoFmt()==AV_PIX_FMT_RGB24) {
-            fillPixelRGB24(mediaData.get(), frame, scaler.outVideoWidth(), pixelHeight);
+        if(frame->format==AV_PIX_FMT_YUV420P) {
+            fillPixelYUV420P(mediaData.get(), frame, frame->width, pixelHeight);
+        } else if(frame->format==AV_PIX_FMT_RGB24) {
+            fillPixelRGB24(mediaData.get(), frame, frame->width, pixelHeight);
         }
         videoDataReady(mediaData);
     } catch(...) {
@@ -627,7 +632,7 @@ int FFmpegMediaDecoder::open(const char* input,
     mStatus = Broken;
 
     //2.打开输入视频文件
-    strncmp(mInputUrl, input, sizeof(mInputUrl));
+    strncpy(mInputUrl, input, sizeof(mInputUrl));
     ret = avformat_open_input(&pFormatCtx, input, NULL, &options);
     av_dict_free(&options);
     if (ret != 0) {
@@ -711,8 +716,6 @@ void FFmpegMediaDecoder::close()
 
     scaler.freeAudioResample();
     scaler.freeVideoScale();
-
-    memset(mInputUrl, 0 ,sizeof(mInputUrl));
 
     mStatus = Closed;
 }
@@ -830,6 +833,11 @@ bool FFmpegMediaDecoder::isHwaccels()
 
 const char* FFmpegMediaDecoder::inputfile()
 {
+    if(pFormatCtx&&pFormatCtx->url)
+        strncpy(mInputUrl, pFormatCtx->url, sizeof(mInputUrl));
+    else
+        memset(mInputUrl, 0, sizeof(mInputUrl));
+
     return mInputUrl;
 }
 

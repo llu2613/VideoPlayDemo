@@ -111,7 +111,7 @@ int FFmpegSwscale::scale(AVFrame *pFrame, int srcSliceH, AVFrame *pOutFrame)
     return out_height;
 }
 
-enum AVPixelFormat FFmpegSwscale::inPixelFmt()
+enum AVPixelFormat FFmpegSwscale::inFormat()
 {
     return in_frame_fmt;
 }
@@ -124,7 +124,7 @@ int FFmpegSwscale::inWidth()
     return in_frame_width;
 }
 
-enum AVPixelFormat FFmpegSwscale::outPixelFmt()
+enum AVPixelFormat FFmpegSwscale::outFormat()
 {
     return out_frame_fmt;
 }

@@ -10,7 +10,7 @@
 #include "AVSynchronizer.h"
 
 class StreamMediaDecoder : public QObject,
-        protected FFmpegMediaDecoderCallback,
+        protected FFmpegMediaDecoder,
         private RepRunnable
 {
     Q_OBJECT
@@ -18,6 +18,7 @@ public:
     explicit StreamMediaDecoder(QObject *parent = nullptr);
     ~StreamMediaDecoder();
 
+    void setOutVideoFmt(enum AVPixelFormat fmt);
     void setOutVideo(enum AVPixelFormat fmt, int width, int height);
     void setOutAudio2(int rate, int channels);
     void setOutVideo2(int width, int height);
@@ -33,11 +34,13 @@ public:
 
 protected:
     void onDecodeError(int code, std::string msg);
-    void onAudioDataReady(std::shared_ptr<MediaData> data);
-    void onVideoDataReady(std::shared_ptr<MediaData> data);
+    void audioDecodedData(AVFrame *frame, AVPacket *packet);
+    void videoDecodedData(AVFrame *frame, AVPacket *packet, int pixelHeight);
+
+    void audioDataReady(std::shared_ptr<MediaData> data);
+    void videoDataReady(std::shared_ptr<MediaData> data);
 
 private:
-    FFmpegMediaDecoder mediaDecoder;
     //线程
     RepeatableThread mThread;
     QMutex mStopMutex;

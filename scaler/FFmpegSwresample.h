@@ -24,6 +24,10 @@ public:
 
     void freeOutBuffer(uint8_t **out_buffer, int *out_buffer_size);
 
+    int mallocOutFrame(AVFrame **out_frame, uint8_t **out_buffer, int *out_buffer_size);
+
+    void freeOutFrame(AVFrame **out_frame, uint8_t **out_buffer, int *out_buffer_size);
+
     int convert(AVFrame *frame, uint8_t **out_buffer, int out_buffer_size);
     int convert(const uint8_t **in_buffer, int nb_samples,
                 uint8_t **out_buffer, int out_buffer_size);
