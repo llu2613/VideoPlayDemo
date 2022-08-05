@@ -89,7 +89,7 @@ void StreamMediaDecoder::videoDataReady(std::shared_ptr<MediaData> data)
     video_ts = data->pts;
     syncer->setVideoTimeBaseD(data->time_base_d);
     syncer->setVideoDecodingTs(data->pts);
-	qDebug() << "----videoDataReady----"<< data->pixel_format<<data->width<< data->height;
+    //qDebug() << "----videoDataReady----"<< data->pixel_format<<data->width<< data->height;
     emit videoData(data);
 }
 
@@ -154,7 +154,7 @@ void StreamMediaDecoder::run()
 
         retCode = decoding();
         if(retCode<0) {
-            qDebug()<<"----decode-failure----"<<status();
+            qDebug()<<"----decode-failure----";
             break;
         }
 

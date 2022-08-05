@@ -24,8 +24,6 @@ public:
     void setOutVideo2(int width, int height);
     std::shared_ptr<AVSynchronizer> &getSynchronizer();
 
-    void setInputUrl();
-
     void startPlay(QString url, bool isHwaccels);
 
     void stopPlay();

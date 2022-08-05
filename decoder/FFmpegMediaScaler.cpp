@@ -7,8 +7,6 @@ FFmpegMediaScaler::FFmpegMediaScaler()
     pVideoScale = nullptr;
     pVideoOutFrame = nullptr;
     pVideoOutBuffer = nullptr;
-    isAudioOutFrameRef = false;
-    isVideoOutFrameRef = false;
 
     dst_audio_fmt = AV_SAMPLE_FMT_S16;
     dst_audio_rate = 48000;
@@ -285,7 +283,6 @@ uint8_t * FFmpegMediaScaler::audioConvert(const uint8_t **in_buffer, int nb_samp
     if(out_samples) {
         *out_sp = out_samples;
         *out_sz = out_buffer_size;
-        isAudioOutFrameRef = true;
         return pAudioOutBuffer;
     }
     return nullptr;
@@ -313,7 +310,6 @@ AVFrame* FFmpegMediaScaler::videoScale(int pixelHeight, AVFrame *frame, int *out
         pVideoOutFrame->format = pVideoScale->outFormat();
         pVideoOutFrame->width = pVideoScale->outWidth();
         pVideoOutFrame->height = pVideoScale->outHeight();
-        isVideoOutFrameRef = true;
         return pVideoOutFrame;
     }
     return nullptr;

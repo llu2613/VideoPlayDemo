@@ -86,13 +86,11 @@ private:
     AVFrame *pAudioOutFrame;
     uint8_t *pAudioOutBuffer;
     int audioOutBufferSize;
-    bool isAudioOutFrameRef;
     //视频缩放
     FFmpegSwscale *pVideoScale;
     AVFrame *pVideoOutFrame;
     uint8_t *pVideoOutBuffer;
     int videoOutBufferSize;
-    bool isVideoOutFrameRef;
 
     std::recursive_mutex audioMutex, videoMutex;
 
