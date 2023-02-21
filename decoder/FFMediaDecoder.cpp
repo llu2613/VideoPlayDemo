@@ -1,4 +1,4 @@
-#include "FFMediaDecoder.h"
+﻿#include "FFMediaDecoder.h"
 
 #define INTERRUPT_TIMEOUT (10 * 1000 * 1000)
 
@@ -8,19 +8,40 @@
  * Access the power of hardware accelerated video codecs in your Windows applications via FFmpeg / libavcodec
  * https://habr.com/en/company/intel/blog/575632/
 */
-
+static int get_hwdevice_support_hw_fmt(AVBufferRef *hw_device_ctx, int target_fmt)
+{
+    AVHWFramesConstraints* hw_frames_const = av_hwdevice_get_hwframe_constraints(hw_device_ctx, NULL);
+    enum AVPixelFormat found = AV_PIX_FMT_NONE;
+    if (hw_frames_const) {
+        for (enum AVPixelFormat* p = hw_frames_const->valid_hw_formats;
+            *p != AV_PIX_FMT_NONE; p++)
+        {
+            if(target_fmt==*p) {
+                found = *p;
+                break;
+            }
+        }
+        av_hwframe_constraints_free(&hw_frames_const);
+    }
+    return found;
+}
 static enum AVPixelFormat get_hw_format(AVCodecContext *ctx,
                                         const enum AVPixelFormat *pix_fmts)
 {
-
     if(ctx && ctx->opaque) {
-        const enum AVPixelFormat *p;
+        AVPixelFormat found=AV_PIX_FMT_NONE;
         FFMediaDecoder *self = static_cast<FFMediaDecoder*>(ctx->opaque);
-        AVPixelFormat hw_pix_fmt = self? self->_hw_pix_fmt(): AV_PIX_FMT_NONE;
+        const AVPixelFormat hw_pix_fmt = self? self->_hw_pix_fmt(): AV_PIX_FMT_NONE;
+        const AVPixelFormat *p=NULL;
         for (p = pix_fmts; *p != -1; p++) {
-            if (*p == hw_pix_fmt)
-                return *p;
+            self->printInfo(av_get_pix_fmt_name(*p));
+            if (*p == hw_pix_fmt) {
+                found = hw_pix_fmt;
+                //return *p;
+            }
         }
+        if(found!=AV_PIX_FMT_NONE)
+            return found;
     }
 
     //fprintf(stderr, "Failed to get HW surface format.\n");
@@ -43,8 +64,9 @@ FFMediaDecoder::FFMediaDecoder()
     pAudioCodecCtx = nullptr;
     pVideoCodecCtx = nullptr;
     hw_device_ctx = nullptr;
-	mAVFrame = nullptr;
-	mAVPacket = nullptr;
+    mAVFrame = nullptr;
+    mHwFrame = nullptr;
+    mAVPacket = nullptr;
 
     audio_stream_idx = -1;
     video_stream_idx = -1;
@@ -63,11 +85,9 @@ FFMediaDecoder::~FFMediaDecoder()
 int FFMediaDecoder::decode_video_frame_hw(AVCodecContext *pCodecCtx, AVFrame *frame, AVPacket *packet)
 {
     int ret = 0;
-    AVFrame *sw_frame = NULL;
 
-    if (!(sw_frame = av_frame_alloc())) {
-        print_averror("Can not alloc frame", -1);
-        return ret;
+    if(!mHwFrame) {
+        mHwFrame = av_frame_alloc();
     }
 
     ret = avcodec_send_packet(pCodecCtx, packet);
@@ -76,8 +96,8 @@ int FFMediaDecoder::decode_video_frame_hw(AVCodecContext *pCodecCtx, AVFrame *fr
         return ret;
     }
 
-    while (1) {
-        int errcode = avcodec_receive_frame(pCodecCtx, sw_frame);
+    while (true) {
+        int errcode = avcodec_receive_frame(pCodecCtx, mHwFrame);
         if (errcode == AVERROR(EAGAIN) || errcode == AVERROR_EOF) {
             break;
         } else if (errcode < 0) {
@@ -86,27 +106,25 @@ int FFMediaDecoder::decode_video_frame_hw(AVCodecContext *pCodecCtx, AVFrame *fr
             break;
         }
 
-        if(!sws_isSupportedInput((AVPixelFormat)sw_frame->format)) {
-        //if(frame->format == hw_pix_fmt) {
+        //if(!sws_isSupportedInput((AVPixelFormat)sw_frame->format)) {
+        if (get_hwdevice_support_hw_fmt(hw_device_ctx, frame->format)>=0) {
             /* retrieve data from GPU to CPU */
-            if ((ret = av_hwframe_transfer_data(frame, sw_frame, 0)) < 0) {
+            if ((ret = av_hwframe_transfer_data(frame, mHwFrame, 0)) < 0) {
                 print_averror("Error transferring the data to system memory", ret);
                 break;
             }
+            av_frame_unref(mHwFrame);
         } else {
-            av_frame_copy(frame, sw_frame);
-            av_frame_ref(frame, sw_frame);
+            av_frame_unref(frame);
+            av_frame_ref(frame, mHwFrame);
         }
 
-        videoDecodedData(frame, packet, pCodecCtx->height);
         if(frame->decode_error_flags) {
             print_error("video decode_error_flags:%d", frame->decode_error_flags);
         }
+        videoDecodedData(frame, packet, pCodecCtx->height);
         av_frame_unref(frame);
     }
-
-    if(sw_frame)
-        av_frame_free(&sw_frame);
 
     return ret;
 }
@@ -120,16 +138,17 @@ int FFMediaDecoder::decode_video_frame(AVCodecContext *pCodecCtx, AVFrame *frame
         return ret;
     }
 
-    while (1) {
+    while (true) {
         int errcode = avcodec_receive_frame(pCodecCtx, frame);
         if (errcode != 0) {
             break;
         }
 
-        videoDecodedData(frame, packet, pCodecCtx->height);
         if(frame->decode_error_flags) {
             print_error("video decode_error_flags:%d", frame->decode_error_flags);
         }
+        videoDecodedData(frame, packet, pCodecCtx->height);
+        av_frame_unref(frame);
     }
 
     return ret;
@@ -146,22 +165,27 @@ int FFMediaDecoder::hw_decoder_init(AVCodecContext *ctx, const enum AVHWDeviceTy
     }
     ctx->hw_device_ctx = av_buffer_ref(hw_device_ctx);
 
-    hw_formats.clear();
-
+    //report
     AVHWFramesConstraints* hw_frames_const = av_hwdevice_get_hwframe_constraints(hw_device_ctx, NULL);
     if (hw_frames_const) {
+        char buf[2048];
+        int offset=0;
+        offset+=sprintf(buf+offset, "valid_hw_formats{");
         for (AVPixelFormat* p = hw_frames_const->valid_hw_formats;
             *p != AV_PIX_FMT_NONE; p++) {
-            hw_formats.push_back(*p);
-            //qDebug()<<"hw_formats"<<QString::fromLocal8Bit(av_get_pix_fmt_name(*p));
+            offset+=sprintf(buf+offset, "%s(%d),", av_get_pix_fmt_name(*p), *p);
         }
+        offset+=sprintf(buf+offset, "}");
+        offset+=sprintf(buf+offset, "valid_sw_formats{");
         for (AVPixelFormat* p = hw_frames_const->valid_sw_formats;
             *p != AV_PIX_FMT_NONE; p++) {
-            //qDebug()<<"sw_formats"<<QString::fromLocal8Bit(av_get_pix_fmt_name(*p));
+            offset+=sprintf(buf+offset, "%s(%d),", av_get_pix_fmt_name(*p), *p);
         }
+        offset+=sprintf(buf+offset, "}");
         av_hwframe_constraints_free(&hw_frames_const);
+        printInfo(buf);
     } else {
-        //qDebug()<<"hw_frames_const is null"<<type;
+        printInfo("hw_frames_const is null");
     }
 
     return err;
@@ -169,37 +193,82 @@ int FFMediaDecoder::hw_decoder_init(AVCodecContext *ctx, const enum AVHWDeviceTy
 
 const AVCodecHWConfig *FFMediaDecoder::find_hwaccel(const AVCodec *codec, enum AVPixelFormat pix_fmt)
 {
-    std::list<enum AVHWDeviceType> typeList;
-    std::list<std::string> typeNameList;
+    /* ./ffmpeg -hwaccels */
+    /* ./ffmpeg -pix_fmts */
+    std::list<enum AVHWDeviceType> types;
     enum AVHWDeviceType type = AV_HWDEVICE_TYPE_NONE;
     while((type = av_hwdevice_iterate_types(type)) != AV_HWDEVICE_TYPE_NONE) {
-        typeList.push_back(type);
-        const char *type_name = av_hwdevice_get_type_name(type);
-        if(type_name)
-            typeNameList.push_back(type_name);
+        types.push_back(type);
     }
 
+    const AVCodecHWConfig* best = NULL;
+    std::list<const AVCodecHWConfig*> configs;
+    std::list<const AVCodecHWConfig*> supports;
     for (int i=0;;i++) {
         const AVCodecHWConfig *config = avcodec_get_hw_config(codec, i);
         if (!config) {
-            print_error("Decoder does not support hw device");
-            return NULL;
+            //print_error("Decoder does not support hw device");
+            break;
         }
-
-        if (config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX &&
-                    config->device_type == type) {
+        /*if (config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX &&
+                    config->device_type==type) {
                     hw_pix_fmt = config->pix_fmt;
                     break;
-        }
+        }*/
+        configs.push_back(config);
         if (config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX) {
-            for(std::list<AVHWDeviceType>::iterator iter=typeList.begin();
-                iter!=typeList.end();iter++) {
-                if(*iter==config->device_type)
-                    return config;
+            for(std::list<AVHWDeviceType>::iterator iter=types.begin();
+                iter!=types.end();iter++) {
+                if(*iter==config->device_type) {
+                    supports.push_back(config);
+                    if(config->pix_fmt==pix_fmt) {
+                        best = config;
+                    }
+                }
             }
         }
     }
+    //report
+    char buf[2048]; int offset=0;
+    offset+=sprintf(buf+offset, "pix_fmt: {%s(%d)}", av_get_pix_fmt_name(pix_fmt), pix_fmt);
+    offset+=sprintf(buf+offset, "hwdevice: {");
+    for(AVHWDeviceType t: types) {
+        offset+=sprintf(buf+offset, "%s(%d), ", av_hwdevice_get_type_name(t), t);
+    }
+    offset+=sprintf(buf+offset, "}");
+    offset+=sprintf(buf+offset, "configs: {");
+    for(const AVCodecHWConfig* c: configs) {
+        offset+=sprintf(buf+offset, "%s(%d) %s(%d) %s, ",
+                      av_hwdevice_get_type_name(c->device_type), c->device_type,
+                      av_get_pix_fmt_name(c->pix_fmt), c->pix_fmt,
+                      sws_isSupportedInput(c->pix_fmt)>0?"sws":"no");
+    }
+    offset+=sprintf(buf+offset, "}");
+    offset+=sprintf(buf+offset, "supports: {");
+    for(const AVCodecHWConfig* c: supports) {
+        offset+=sprintf(buf+offset, "%s(%d) %s(%d) %s, ",
+                      av_hwdevice_get_type_name(c->device_type), c->device_type,
+                      av_get_pix_fmt_name(c->pix_fmt), c->pix_fmt,
+                      sws_isSupportedInput(c->pix_fmt)>0?"sws":"no");
+    }
+    offset+=sprintf(buf+offset, "}");
+    if(best) {
+        offset+=sprintf(buf+offset, " best: {%s(%d) %s(%d)}",
+                        av_hwdevice_get_type_name(best->device_type), best->device_type,
+                        av_get_pix_fmt_name(best->pix_fmt), best->pix_fmt);
+    }
+    printInfo(buf);
 
+    if(best) {
+        return best;
+    } else if(supports.size()) {
+        for (std::list<const AVCodecHWConfig*>::iterator itr=supports.begin();
+             itr!=supports.end();itr++) {
+            if(sws_isSupportedInput((*itr)->pix_fmt)>0) {
+                return (*itr);
+            }
+        }
+    }
     return NULL;
 }
 
@@ -220,11 +289,13 @@ int FFMediaDecoder::openHwCodec(AVFormatContext *pFormatCtx, int stream_idx,
 
     const AVCodecHWConfig* config = find_hwaccel(pCodec, (enum AVPixelFormat)pCodecPar->format);
     if(config == NULL) {
-        print_error("avcodec_find_decoder is null");
+        print_error("find_hwaccel is null");
         return -1;
     }
+    hw_pix_fmt = config->pix_fmt;
 
-    print_info("find_hwaccel: fmt %d %s", config->pix_fmt, av_hwdevice_get_type_name(config->device_type));
+    print_info("find_hwaccel: %s fmt: %s(%d)", av_hwdevice_get_type_name(config->device_type),
+               av_get_pix_fmt_name(config->pix_fmt), config->pix_fmt);
 
     *pCodeCtx = avcodec_alloc_context3(pCodec);
     if (*pCodeCtx == NULL) {
@@ -237,8 +308,9 @@ int FFMediaDecoder::openHwCodec(AVFormatContext *pFormatCtx, int stream_idx,
         return ret;
     }
 
-//    (*pCodeCtx)->get_format  = get_hw_format;
-//    (*pCodeCtx)->opaque = this;
+    (*pCodeCtx)->get_format  = get_hw_format;
+    //(*pCodeCtx)->pix_fmt = AV_PIX_FMT_YUV420P;
+    (*pCodeCtx)->opaque = this;
 
     if ((ret=hw_decoder_init(*pCodeCtx, config->device_type)) < 0) {
         print_averror("Failed to init specified HW device", ret);
@@ -258,11 +330,6 @@ int FFMediaDecoder::openCodec(AVFormatContext *pFormatCtx, int stream_idx,
                                   AVCodecContext **pCodeCtx)
 {
     int ret =0;
-    //4.获取解码器
-    //根据索引拿到对应的流,根据流拿到解码器上下文
-    //*pCodeCtx = pFormatCtx->streams[stream_idx]->codec;
-    //再根据上下文拿到编解码id，通过该id拿到解码器
-    //AVCodec *pCodec = avcodec_find_decoder((*pCodeCtx)->codec_id);
 
     AVCodecParameters *pCodecPar = pFormatCtx->streams[stream_idx]->codecpar;
     AVCodec *pCodec = avcodec_find_decoder(pCodecPar->codec_id);
@@ -271,7 +338,7 @@ int FFMediaDecoder::openCodec(AVFormatContext *pFormatCtx, int stream_idx,
     *pCodeCtx = avcodec_alloc_context3(pCodec);
     avcodec_parameters_to_context(*pCodeCtx, pCodecPar);
 
-    if (*pCodeCtx == NULL) {
+    if ((*pCodeCtx) == NULL) {
         print_error("pCodeCtx is null");
         return -1;
     }
@@ -279,7 +346,7 @@ int FFMediaDecoder::openCodec(AVFormatContext *pFormatCtx, int stream_idx,
         print_error("pCodec is null");
         return -1;
     }
-    //5.打开解码器
+
     ret = avcodec_open2(*pCodeCtx, pCodec, NULL);
     if (ret < 0) {
         print_averror("avcodec_open2", ret);
@@ -392,11 +459,24 @@ int FFMediaDecoder::open(const char* input,
         print_error("find more %d video stream", audio_stream_count);
     }
 
-    if(!mAVFrame)
-        mAVFrame = av_frame_alloc();
-
-    if(!mAVPacket)
-        mAVPacket = av_packet_alloc();
+    if(!mAVFrame) {
+        if (!(mAVFrame=av_frame_alloc())) {
+            print_averror("Can not alloc frame", -1);
+            return -1;
+        }
+    }
+    if(!mHwFrame) {
+        if (!(mHwFrame=av_frame_alloc())) {
+            print_averror("Can not alloc frame", -1);
+            return -1;
+        }
+    }
+    if(!mAVPacket) {
+        if (!(mAVPacket=av_packet_alloc())) {
+            print_averror("Can not alloc packet", -1);
+            return -1;
+        }
+    }
 
     return ret;
 }
@@ -424,6 +504,9 @@ void FFMediaDecoder::close()
     if(mAVFrame) {
         av_frame_free(&mAVFrame);
     }
+    if(mHwFrame) {
+        av_frame_free(&mHwFrame);
+    }
     if(mAVPacket) {
         av_packet_free(&mAVPacket);
     }
@@ -436,14 +519,8 @@ int FFMediaDecoder::decoding()
         return -1;
     }
 
-    if(!mAVFrame) {
-        printf("mAVFrame is null");
-        return -1;
-    }
-
     if(!mAVPacket) {
-        printf("mAVPacket is null");
-        return -1;
+        mAVPacket = av_packet_alloc();
     }
 
     //6.一帧一帧读取压缩的音频数据AVPacket
@@ -458,8 +535,14 @@ int FFMediaDecoder::decoding()
 
     //解码
     if (mAVPacket->stream_index == audio_stream_idx) {
+        if(!mAVFrame) {
+            mAVFrame = av_frame_alloc();
+        }
         ret = audioRawFrame(pAudioCodecCtx, mAVFrame, mAVPacket);
     } else if(mAVPacket->stream_index == video_stream_idx) {
+        if(!mAVFrame) {
+            mAVFrame = av_frame_alloc();
+        }
         ret = videoRawFrame(pVideoCodecCtx, mAVFrame, mAVPacket);
     } else {
         //print_error("unsupport stream index %d", mAVPacket->stream_index);

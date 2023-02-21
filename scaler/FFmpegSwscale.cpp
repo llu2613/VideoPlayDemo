@@ -5,6 +5,8 @@ FFmpegSwscale::FFmpegSwscale()
     swsCtx = nullptr;
 
     ctx = avformat_alloc_context();
+
+    reset();
 }
 
 FFmpegSwscale::~FFmpegSwscale()
@@ -14,6 +16,16 @@ FFmpegSwscale::~FFmpegSwscale()
 
     if(ctx)
         avformat_free_context(ctx);
+}
+
+void FFmpegSwscale::reset()
+{
+    in_frame_fmt = AV_PIX_FMT_NONE;
+    in_frame_width = 0;
+    in_frame_height = 0;
+    out_frame_fmt = AV_PIX_FMT_NONE;
+    out_frame_width = 0;
+    out_frame_height = 0;
 }
 
 int FFmpegSwscale::init(AVCodecContext *pCodecCtx,

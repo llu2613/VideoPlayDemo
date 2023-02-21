@@ -29,6 +29,8 @@ public:
 
     int scale(AVFrame *pFrame, int srcSliceH, AVFrame *pOutFrame);
 
+    void reset();
+
     enum AVPixelFormat inFormat();
     int inHeight();
     int inWidth();

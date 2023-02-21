@@ -5,14 +5,27 @@ FFmpegSwresample::FFmpegSwresample()
     swrCtx = swr_alloc();
 
     ctx = avformat_alloc_context();
+
+    reset();
 }
 
 FFmpegSwresample::~FFmpegSwresample()
 {
-    swr_free(&swrCtx);
+    if(swrCtx)
+        swr_free(&swrCtx);
 
     if(ctx)
         avformat_free_context(ctx);
+}
+
+void FFmpegSwresample::reset()
+{
+    in_sample_fmt = AV_SAMPLE_FMT_NONE;
+    in_sample_rate = 0;
+    in_channel_layout = 0;
+    out_sample_fmt = AV_SAMPLE_FMT_NONE;
+    out_sample_rate = 0;
+    out_channel_layout = 0;
 }
 
 int FFmpegSwresample::init(enum AVSampleFormat in_fmt, int in_rate, uint64_t in_ch_layout,
@@ -20,15 +33,8 @@ int FFmpegSwresample::init(enum AVSampleFormat in_fmt, int in_rate, uint64_t in_
 {
     int ret =0;
 
-    in_sample_fmt = in_fmt;
-    in_sample_rate = in_rate;
-    in_channel_layout = in_ch_layout;
-    out_sample_fmt = out_fmt;
-    out_sample_rate = out_rate;
-    out_channel_layout = out_ch_layout;
-
-    swrCtx = swr_alloc_set_opts(swrCtx, out_ch_layout, out_sample_fmt, out_sample_rate,
-                       in_ch_layout, in_sample_fmt, in_sample_rate, 0, NULL);
+    swrCtx = swr_alloc_set_opts(swrCtx, out_ch_layout, out_fmt, out_rate,
+                       in_ch_layout, in_fmt, in_rate, 0, NULL);
     ret = swr_init(swrCtx);
     if(ret<0) {
         av_log(ctx, AV_LOG_ERROR, "swr_init failed");
@@ -38,8 +44,14 @@ int FFmpegSwresample::init(enum AVSampleFormat in_fmt, int in_rate, uint64_t in_
     //获取输出的声道个数
     out_channel_nb = av_get_channel_layout_nb_channels(out_ch_layout);
     //pcm数据长度
-    out_count = av_samples_get_buffer_size(NULL, out_channel_nb,
-                                           out_sample_rate, out_sample_fmt, 0);
+    out_count = av_samples_get_buffer_size(NULL, out_channel_nb, out_rate, out_fmt, 0);
+
+    in_sample_fmt = in_fmt;
+    in_sample_rate = in_rate;
+    in_channel_layout = in_ch_layout;
+    out_sample_fmt = out_fmt;
+    out_sample_rate = out_rate;
+    out_channel_layout = out_ch_layout;
 
     return ret;
 }

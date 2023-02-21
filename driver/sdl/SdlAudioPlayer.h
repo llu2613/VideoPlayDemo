@@ -56,7 +56,9 @@ public:
     void clearSourceData(int sourceId);
     void clearData(int cardId, int sourceId);
 
-    int bufferSize(int cardId, int sourceId);
+    long bufferSize(int cardId, int sourceId);
+    long memorySize(int cardId, int sourceId);
+    long sampleSize(int cardId, int sourceId);
 
     std::list<std::string> devices();
 

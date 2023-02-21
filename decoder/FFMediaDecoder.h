@@ -1,4 +1,4 @@
-#ifndef FFMEDIADECODER_H
+﻿#ifndef FFMEDIADECODER_H
 #define FFMEDIADECODER_H
 
 #include <list>
@@ -62,11 +62,11 @@ private:
     AVCodecContext *pAudioCodecCtx, *pVideoCodecCtx;
     AVBufferRef *hw_device_ctx;
     AVPixelFormat hw_pix_fmt;
-    std::list<enum AVPixelFormat> hw_formats;
     int audio_stream_idx, video_stream_idx;
 
     AVPacket *mAVPacket;
     AVFrame *mAVFrame;
+    AVFrame *mHwFrame;
 
     char mInputUrl[256];
     bool mIsHwaccels;

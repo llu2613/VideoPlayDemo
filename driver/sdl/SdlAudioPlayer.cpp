@@ -1,6 +1,7 @@
 ﻿#include "SdlAudioPlayer.h"
 #include <string.h>
 
+#define DEBUG(fmt,...) SDL_LogDebug(SDL_LOG_CATEGORY_AUDIO, fmt, ##__VA_ARGS__)
 #define INFO(fmt,...) SDL_LogInfo(SDL_LOG_CATEGORY_AUDIO, fmt, ##__VA_ARGS__)
 #define WARNING(fmt,...) SDL_LogWarn(SDL_LOG_CATEGORY_AUDIO, fmt, ##__VA_ARGS__)
 #define ERROR(fmt,...) SDL_LogError(SDL_LOG_CATEGORY_AUDIO, fmt, ##__VA_ARGS__)
@@ -117,10 +118,10 @@ void SdlAudioPlayer::addData(int cardId, int sourceId, Uint8 *buf, int bufLen,
             card.device->addData(sourceId, buf, bufLen, timestamp);
             card.device->resume();
         } else {
-            WARNING("Sound card is not initialized, cardId:%d", cardId);
+            DEBUG("Sound card is not initialized, cardId:%d", cardId);
         }
     } else {
-        WARNING("SoundCard %d is disable!", cardId);
+        DEBUG("SoundCard %d is disable!", cardId);
     }
     card.mutex.unlock();
 }
@@ -139,7 +140,7 @@ void SdlAudioPlayer::setVolume(int cardId, int volume)
     if(card.device) {
         card.device->setMixVolume(volume);
     } else {
-        INFO("Sound card is not initialized, cardId:%d", cardId);
+        DEBUG("Sound card is not initialized, cardId:%d", cardId);
     }
     card.mutex.unlock();
 }
@@ -159,7 +160,7 @@ int SdlAudioPlayer::volume(int cardId)
     if(card.device) {
         val = card.device->mixVolume();
     } else {
-        INFO("Sound card is not initialized, cardId:%d", cardId);
+        DEBUG("Sound card is not initialized, cardId:%d", cardId);
     }
     card.mutex.unlock();
 
@@ -180,7 +181,7 @@ void SdlAudioPlayer::clearData(int cardId, int sourceId)
     if(card.device) {
         card.device->clear(sourceId);
     } else {
-        INFO("Sound card is not initialized, cardId:%d", cardId);
+        DEBUG("Sound card is not initialized, cardId:%d", cardId);
     }
     card.mutex.unlock();
 }
@@ -199,7 +200,7 @@ void SdlAudioPlayer::clearCardData(int cardId)
     if(card.device) {
         card.device->clearAll();
     } else {
-        INFO("Sound card is not initialized, cardId:%d", cardId);
+        DEBUG("Sound card is not initialized, cardId:%d", cardId);
     }
     card.mutex.unlock();
 }
@@ -343,7 +344,7 @@ void SdlAudioPlayer::closeCard(int cardId)
     INFO("closeCard: cardId: %d", cardId);
 }
 
-int SdlAudioPlayer::bufferSize(int cardId, int sourceId)
+long SdlAudioPlayer::bufferSize(int cardId, int sourceId)
 {
     if(cardId>=0&&cardId<MAX_CARD_NUM) {
     } else {
@@ -358,6 +359,52 @@ int SdlAudioPlayer::bufferSize(int cardId, int sourceId)
     card.mutex.lock();
     if(card.device) {
         size = card.device->bufferSize(sourceId);
+    } else {
+        INFO("Sound card is not initialized, cardId:%d", cardId);
+    }
+    card.mutex.unlock();
+
+    return size;
+}
+
+long SdlAudioPlayer::memorySize(int cardId, int sourceId)
+{
+    if(cardId>=0&&cardId<MAX_CARD_NUM) {
+    } else {
+        WARNING("Invalid sound card id:%d", cardId);
+        return 0;
+    }
+
+    SoundCard &card = mCardArray[cardId];
+
+    int size = 0;
+
+    card.mutex.lock();
+    if(card.device) {
+        size = card.device->memorySize(sourceId);
+    } else {
+        INFO("Sound card is not initialized, cardId:%d", cardId);
+    }
+    card.mutex.unlock();
+
+    return size;
+}
+
+long SdlAudioPlayer::sampleSize(int cardId, int sourceId)
+{
+    if(cardId>=0&&cardId<MAX_CARD_NUM) {
+    } else {
+        WARNING("Invalid sound card id:%d", cardId);
+        return 0;
+    }
+
+    SoundCard &card = mCardArray[cardId];
+
+    int size = 0;
+
+    card.mutex.lock();
+    if(card.device) {
+        size = card.device->sampleSize(sourceId);
     } else {
         INFO("Sound card is not initialized, cardId:%d", cardId);
     }

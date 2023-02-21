@@ -1,4 +1,4 @@
-#include "VideoBuffer.h"
+﻿#include "VideoBuffer.h"
 #include <QTime>
 #include <QElapsedTimer>
 #include <QDebug>
@@ -41,14 +41,20 @@ void VideoBuffer::run()
     isThRunning = true;
     QElapsedTimer eTimer;
     uint64_t playUs = 0;
+    uint64_t last_pts = 0;
     while (isThRunning) {
 
-        double frame_delay = 1.0/(mFrameRate>0?mFrameRate:DEFAULT_FRAME_RATE);
+        double frame_delay_us = (1000*1000)*1.0/(mFrameRate>0?mFrameRate:DEFAULT_FRAME_RATE);
 
         mDataMutex.lock();
         if(mDataList.length()) {
             MediaData *data = mDataList.takeFirst();
 
+//            uint64_t durUs = 0;
+//            if(last_pts && data->pts>last_pts) {
+//                durUs = (data->pts-last_pts)*data->time_base_d*1000*1000;
+//            }
+//            last_pts = data->pts;
             uint64_t durUs = data->duration*data->time_base_d*1000*1000;
 
             if(!playUs) {
@@ -74,6 +80,10 @@ void VideoBuffer::run()
                     qDebug()<<"discard one frame";
 
                     data = mDataList.takeFirst();
+//                    if(last_pts && data->pts>last_pts) {
+//                        durUs = (data->pts-last_pts)*data->time_base_d*1000*1000;
+//                    }
+//                    last_pts = data->pts;
                     durUs = data->duration*data->time_base_d*1000*1000;
                 }
             }
@@ -84,6 +94,8 @@ void VideoBuffer::run()
                 mSyncMutex.lock();
                 if(mSync) {
                     mSync->setVideoPlayingTs(data->pts);
+                    int diff = mSync->audioPlayingMs()-mSync->videoPlayingMs();
+                    qDebug()<<"audio-video="<<diff;
                 }
                 mSyncMutex.unlock();
                 std::shared_ptr<MediaData> mediaData(data);
@@ -100,7 +112,7 @@ void VideoBuffer::run()
         }
         mDataMutex.unlock();
 
-        QThread::usleep(frame_delay*1000*1000);
+        QThread::usleep(frame_delay_us);
     }
 
 }

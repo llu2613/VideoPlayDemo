@@ -1,4 +1,4 @@
-#include "AVSynchronizer.h"
+﻿#include "AVSynchronizer.h"
 #include <QDateTime>
 
 /**
@@ -22,12 +22,15 @@ void AVSynchronizer::reset()
     video_play_ts = 0;
     audio_decode_ts = 0;
     video_decode_ts = 0;
-    audio_time_base_d = 0;
-    video_time_base_d = 0;
 
-    start_os_msecond = 0;
+    memset(&audio_time_base, 0, sizeof(audio_time_base));
+    memset(&video_time_base, 0, sizeof(video_time_base));
+
     start_audio_decode_ts = 0;
     start_video_decode_ts = 0;
+
+    QDateTime dateTime = QDateTime::currentDateTime();
+    start_os_msecond = dateTime.toMSecsSinceEpoch();
 }
 
 void AVSynchronizer::resetOsTime()
@@ -39,16 +42,20 @@ void AVSynchronizer::resetOsTime()
     start_video_decode_ts = video_decode_ts;
 }
 
-void AVSynchronizer::setAudioTimeBaseD(double time_base_d)
+void AVSynchronizer::setAudioTimeBase(AVRational time_base)
 {
     std::lock_guard<std::recursive_mutex> lk(mMutex);
-    audio_time_base_d = time_base_d;
+    audio_time_base = time_base;
+    if(start_audio_decode_ts==0)
+        start_audio_decode_ts = audio_decode_ts;
 }
 
-void AVSynchronizer::setVideoTimeBaseD(double time_base_d)
+void AVSynchronizer::setVideoTimeBase(AVRational time_base)
 {
     std::lock_guard<std::recursive_mutex> lk(mMutex);
-    video_time_base_d = time_base_d;
+    video_time_base = time_base;
+    if(start_video_decode_ts==0)
+        start_video_decode_ts = video_decode_ts;
 }
 
 void AVSynchronizer::setAudioDecodingTs(long ts)
@@ -63,18 +70,6 @@ void AVSynchronizer::setVideoDecodingTs(long ts)
     video_decode_ts = ts;
 }
 
-void AVSynchronizer::incAudioDecodingTs(long ts)
-{
-    std::lock_guard<std::recursive_mutex> lk(mMutex);
-    audio_decode_ts += ts;
-}
-
-void AVSynchronizer::incVideoDecodingTs(long ts)
-{
-    std::lock_guard<std::recursive_mutex> lk(mMutex);
-    video_decode_ts += ts;
-}
-
 void AVSynchronizer::setAudioPlayingTs(long ts)
 {
     std::lock_guard<std::recursive_mutex> lk(mMutex);
@@ -85,18 +80,6 @@ void AVSynchronizer::setVideoPlayingTs(long ts)
 {
     std::lock_guard<std::recursive_mutex> lk(mMutex);
     video_play_ts = ts;
-}
-
-void AVSynchronizer::incAudioPlayingTs(long ts)
-{
-    std::lock_guard<std::recursive_mutex> lk(mMutex);
-    audio_play_ts += ts;
-}
-
-void AVSynchronizer::incVideoPlayingTs(long ts)
-{
-    std::lock_guard<std::recursive_mutex> lk(mMutex);
-    video_play_ts += ts;
 }
 
 long AVSynchronizer::audioDecodingTs()
@@ -123,6 +106,22 @@ long AVSynchronizer::videoPlayingTs()
     return video_play_ts;
 }
 
+long AVSynchronizer::audioPlayingMs()
+{
+    std::lock_guard<std::recursive_mutex> lk(mMutex);
+    double audio_time_base_d = av_q2d(audio_time_base);
+    long msec = (long)(audio_play_ts*audio_time_base_d*1000);
+    return msec;
+}
+
+long AVSynchronizer::videoPlayingMs()
+{
+    std::lock_guard<std::recursive_mutex> lk(mMutex);
+    double video_time_base_d = av_q2d(video_time_base);
+    long msec = (long)(video_play_ts*video_time_base_d*1000);
+    return msec;
+}
+
 long AVSynchronizer::getAudioDelayTs()
 {
     std::lock_guard<std::recursive_mutex> lk(mMutex);
@@ -135,25 +134,28 @@ long AVSynchronizer::getVideoDelayTs()
     return video_play_ts!=0?video_decode_ts-video_play_ts:0;
 }
 
-double AVSynchronizer::getAudioDelaySec()
+long AVSynchronizer::getAudioDelayMs()
 {
     std::lock_guard<std::recursive_mutex> lk(mMutex);
-    return getAudioDelayTs()*audio_time_base_d;
+    return getAudioDelayTs() * av_q2d(audio_time_base);
 }
 
-double AVSynchronizer::getVideoDelaySec()
+long AVSynchronizer::getVideoDelayMs()
 {
     std::lock_guard<std::recursive_mutex> lk(mMutex);
-    return getVideoDelayTs()*video_time_base_d;
+    return getVideoDelayTs() * av_q2d(video_time_base);
 }
 
-double AVSynchronizer::getOsDelaySec()
+long AVSynchronizer::getOsDelayMs()
 {
     std::lock_guard<std::recursive_mutex> lk(mMutex);
 
+    long delayed = 0;
     QDateTime dateTime = QDateTime::currentDateTime();
     long current_os_msecond = dateTime.toMSecsSinceEpoch();
 
+    double audio_time_base_d = av_q2d(audio_time_base);
+    double video_time_base_d = av_q2d(video_time_base);
     long a_msec = (long)((audio_decode_ts-start_audio_decode_ts)*audio_time_base_d*1000);
     long v_msec = (long)((video_decode_ts-start_video_decode_ts)*video_time_base_d*1000);
     long os_msec = current_os_msecond-start_os_msecond;
@@ -162,11 +164,11 @@ double AVSynchronizer::getOsDelaySec()
     long v_diff = v_msec>0&&os_msec>0?v_msec-os_msec:0;
 
     if(a_diff>0 && v_diff>0)
-        return (a_diff<v_diff?a_diff:v_diff)*1.0/1000;
+        delayed = (a_diff<v_diff?a_diff:v_diff);
     if(a_diff>0)
-        return a_diff*1.0/1000;
+        delayed = a_diff;
     if(v_diff>0)
-        return v_diff*1.0/1000;
+        delayed = v_diff;
 
-    return 0;
+    return delayed;
 }

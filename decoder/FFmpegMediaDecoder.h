@@ -27,6 +27,8 @@ public:
     int decoding();
     void close();
 
+    int seekto(double seconds);
+
     void setTag(const char* tag);
     const char* tag();
 
@@ -48,16 +50,19 @@ protected:
     virtual void audioDecodedData(AVFrame *frame, AVPacket *packet) override;
     virtual void videoDecodedData(AVFrame *frame, AVPacket *packet, int pixelHeight) override;
 
+    virtual void audioResampledData(AVFrame *frame, AVPacket *packet,
+                                    uint8_t *sampleBuffer, int bufferSize, int samples);
     virtual void audioResampledData(AVPacket *packet, uint8_t *sampleBuffer,
                                     int bufferSize, int samples);
+    virtual void videoScaledData(AVFrame *frame, AVPacket *packet, AVFrame *scaledFrame, int pixelHeight);
     virtual void videoScaledData(AVFrame *frame, AVPacket *packet, int pixelHeight);
 
     virtual void audioDataReady(std::shared_ptr<MediaData> data);
     virtual void videoDataReady(std::shared_ptr<MediaData> data);
 
 private:
-    long audioFrameCnt, videoFrameCnt;
-    unsigned long audio_pts, video_pts;
+    int64_t video_first_pts, video_last_pts;
+    int64_t audio_pts, video_pts;
 
     std::mutex scaler_mutex;
     FFmpegMediaScaler scaler;

@@ -32,6 +32,8 @@ extern "C" {
 //#include <string.h>
 //#include "libavutil/error.h"
 //}
+
+#include <string.h>
 #define FF_INVALID (-1)
 
 inline char* wrap_av_err2str(int errnum)
@@ -43,6 +45,7 @@ inline char* wrap_av_err2str(int errnum)
     }
     return errbuf;
 }
+
 /*
 int ff_print_frame(AVFrame *frame)
 {

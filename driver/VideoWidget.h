@@ -4,6 +4,7 @@
 #include <QDialog>
 #include <QWidget>
 #include <QTimer>
+#include <QSlider>
 #include "opengl/OpenGLWidget0.h"
 #include "opengl/OpenGLYuvWidget.h"
 #include "opengl/YUVGLWidget.h"
@@ -37,11 +38,14 @@ protected:
 private:
     YUVGLWidget *video;
     VideoBuffer videoBuffer;
+    QSlider *timeSlider;
+    QTimer *mSliderTimer;
 
     StreamMediaDecoder *decoder;
 
     SmtAudioPlayer *smtAudioPlayer;
 
+    int mCardId;
     int mSourceId;
     QList<QSize> sizeList;
     QList<AVPixelFormat> fmtList;
@@ -59,6 +63,9 @@ public slots:
     void onVideoData(std::shared_ptr<MediaData> data);
     void onShowVideoData(std::shared_ptr<MediaData> data);
     void onAudioCardOpened(QString name, int cardId);
+    void onMediaDecoderEvent(int event, QString msg);
+    void onTimeSliderValueChanged(int value);
+    void onSliderTimeout();
 
 private slots:
 

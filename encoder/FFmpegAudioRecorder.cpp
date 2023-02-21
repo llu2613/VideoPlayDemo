@@ -301,7 +301,7 @@ int FFmpegAudioRecorder::open(const char *output, const char *format_name, enum 
     ret = swr_init(swr_ctx);
     if(ret<0) {
         av_log(NULL,AV_LOG_ERROR,"fail to swr_init\n");
-        return -1;
+        return ret;
     }
 
     audio_fifo = av_audio_fifo_alloc(enc_ctx->sample_fmt, enc_ctx->channels, enc_ctx->frame_size);
@@ -310,14 +310,16 @@ int FFmpegAudioRecorder::open(const char *output, const char *format_name, enum 
         return AVERROR(ENOMEM);
     }
 
-    if (avio_open(&ofmt_ctx->pb,output,AVIO_FLAG_WRITE) < 0){
+    ret = avio_open(&ofmt_ctx->pb,output,AVIO_FLAG_WRITE);
+    if (ret < 0){
         av_log(NULL,AV_LOG_ERROR,"fail to open output\n");
-        return -1;
+        return ret;
     }
 
-    if (avformat_write_header(ofmt_ctx,NULL) < 0){
+    ret = avformat_write_header(ofmt_ctx,NULL);
+    if (ret < 0){
         av_log(NULL,AV_LOG_ERROR,"fail to write header");
-        return -1;
+        return ret;
     }
 
     audio_pts = 0;

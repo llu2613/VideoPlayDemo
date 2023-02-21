@@ -6,26 +6,6 @@
 #define INTERRUPT_TIMEOUT (10 * 1000 * 1000)
 
 
-static char* _av_ts2str(int64_t ts) {
-    char av_error[AV_TS_MAX_STRING_SIZE] = {0};
-    return av_ts_make_string(av_error, ts);
-}
-static char* _av_ts2timestr(int64_t ts, AVRational *tb) {
-    char av_error[AV_TS_MAX_STRING_SIZE] = {0};
-    return av_ts_make_time_string(av_error, ts, tb);
-}
-
-static void log_packet(const AVFormatContext *fmt_ctx, const AVPacket *pkt)
-{
-    AVRational *time_base = &fmt_ctx->streams[pkt->stream_index]->time_base;
-
-    printf("pts:%s pts_time:%s dts:%s dts_time:%s duration:%s duration_time:%s stream_index:%d\n",
-           _av_ts2str(pkt->pts), _av_ts2timestr(pkt->pts, time_base),
-           _av_ts2str(pkt->dts), _av_ts2timestr(pkt->dts, time_base),
-           _av_ts2str(pkt->duration), _av_ts2timestr(pkt->duration, time_base),
-           pkt->stream_index);
-}
-
 FFmpegMediaDecoder::FFmpegMediaDecoder()
 {
     mCallback = nullptr;
@@ -40,10 +20,10 @@ FFmpegMediaDecoder::~FFmpegMediaDecoder()
 
 int FFmpegMediaDecoder::open(const char* input, bool hwaccels)
 {
-    audioFrameCnt = 0;
-    videoFrameCnt = 0;
     audio_pts = 0;
     video_pts = 0;
+    video_first_pts = 0;
+    video_last_pts = 0;
 
     return FFMediaDecoder::open(input, NULL, hwaccels);
 }
@@ -65,6 +45,58 @@ void FFmpegMediaDecoder::close()
     std::lock_guard<std::mutex> lk(scaler_mutex);
     scaler.freeAudioResample();
     scaler.freeVideoScale();
+}
+
+int FFmpegMediaDecoder::seekto(double seconds)
+{
+    AVFormatContext* formatCtx = const_cast<AVFormatContext*>(formatContext());
+    const AVStream* astream = audioStream();
+    const AVStream* vstream = videoStream();
+    if (!formatCtx||!astream||!vstream) {
+        return -1;
+    }
+
+    AVStream* ist = NULL;
+    int default_index = av_find_default_stream_index(formatCtx);
+    if(astream&&astream->index==default_index) {
+        ist = const_cast<AVStream*>(astream);
+        printInfo("av_find_default_stream_index is audio");
+    } else if(vstream&&vstream->index==default_index) {
+        ist = const_cast<AVStream*>(vstream);
+        printInfo("av_find_default_stream_index is video");
+    }
+
+    char errbuf[256];
+    if(ist && ist->index == default_index)
+    {
+        long dur = ist->duration * ist->time_base.num / ist->time_base.den;
+        if(seconds>=0 && seconds<dur) {
+            int64_t start_pts = ist->start_time;
+            AVRational time_base = ist->time_base;
+            AVRational AV_TIME_BASE_Q_ = {1, AV_TIME_BASE};
+            int64_t seek_ts = (start_pts!=AV_NOPTS_VALUE?start_pts:0) +
+                    av_rescale_q(seconds * AV_TIME_BASE, AV_TIME_BASE_Q_, time_base);
+
+//            avcodec_flush_buffers(m_codec_ctx.get());
+
+            int err = 0;
+            if(seek_ts > ist->cur_dts) {
+                err = av_seek_frame(formatCtx, ist->index, seek_ts, AVSEEK_FLAG_ANY);
+            } else {
+                err = av_seek_frame(formatCtx, ist->index, seek_ts, AVSEEK_FLAG_ANY | AVSEEK_FLAG_BACKWARD);
+            }
+            if(err<0) {
+                sprintf(errbuf, "av_seek_frame, ret %d", err);
+                printError(errbuf);
+            }
+
+            return err;
+        }
+    } else {
+        printError("unsupport seek frame!");
+    }
+
+    return -1;
 }
 
 void FFmpegMediaDecoder::getOutAudioParams(enum AVSampleFormat *fmt,
@@ -105,13 +137,11 @@ void FFmpegMediaDecoder::setOutVideo(enum AVPixelFormat fmt, int width, int heig
 
 int FFmpegMediaDecoder::audioRawFrame(AVCodecContext *pCodecCtx, AVFrame *frame, AVPacket *packet)
 {
-    audioFrameCnt++;
     return FFMediaDecoder::audioRawFrame(pCodecCtx, frame, packet);
 }
 
 int FFmpegMediaDecoder::videoRawFrame(AVCodecContext *pCodecCtx, AVFrame *frame, AVPacket *packet)
 {
-    videoFrameCnt++;
     return FFMediaDecoder::videoRawFrame(pCodecCtx, frame, packet);
 }
 
@@ -143,7 +173,7 @@ void FFmpegMediaDecoder::audioDecodedData(AVFrame *frame, AVPacket *packet)
 //            fwrite(pAudioOutBuffer, 1, out_buffer_size, fp_pcm);
 //        }
     if(pAudioOutBuffer) {
-        audioResampledData(packet, pAudioOutBuffer, out_buffer_size, out_samples);
+        audioResampledData(frame, packet, pAudioOutBuffer, out_buffer_size, out_samples);
     }
     scaler_mutex.unlock();
 }
@@ -162,6 +192,9 @@ void FFmpegMediaDecoder::videoDecodedData(AVFrame *frame, AVPacket *packet, int 
         printError("videoDecodedData, break frame!");
         return;
     }
+
+    if(video_first_pts==0)
+        video_first_pts = packet->pts;
 
     scaler_mutex.lock();
     if(scaler.isVideoReady()&&scaler.srcVideoFmt()==frame->format
@@ -195,9 +228,15 @@ void FFmpegMediaDecoder::videoDecodedData(AVFrame *frame, AVPacket *packet, int 
 //        }
 
     if (out_frame) {
-        videoScaledData(out_frame, packet, out_height);
+        videoScaledData(frame, packet, out_frame, out_height);
     }
     scaler_mutex.unlock();
+}
+
+void FFmpegMediaDecoder::audioResampledData(AVFrame *frame, AVPacket *packet,
+                                uint8_t *sampleBuffer, int bufferSize, int samples)
+{
+    audioResampledData(packet, sampleBuffer, bufferSize, samples);
 }
 
 void FFmpegMediaDecoder::audioResampledData(AVPacket *packet, uint8_t *sampleBuffer,
@@ -209,8 +248,8 @@ void FFmpegMediaDecoder::audioResampledData(AVPacket *packet, uint8_t *sampleBuf
         mediaData->nb_samples = samples;
         mediaData->sample_rate = scaler.outAudioRate();
         mediaData->channels = scaler.outAudioChannels();
-        mediaData->pts = audio_pts;
-        audio_pts += packet->duration;
+        mediaData->pts = packet->pts;
+//        audio_pts += packet->duration;
         mediaData->duration = packet->duration;
         const AVStream *stream = audioStream();
         mediaData->time_base_d = av_q2d(stream->time_base);
@@ -224,6 +263,12 @@ void FFmpegMediaDecoder::audioResampledData(AVPacket *packet, uint8_t *sampleBuf
     }
 }
 
+void FFmpegMediaDecoder::videoScaledData(AVFrame *frame, AVPacket *packet,
+                                         AVFrame *scaledFrame, int pixelHeight)
+{
+    videoScaledData(scaledFrame, packet, pixelHeight);
+}
+
 void FFmpegMediaDecoder::videoScaledData(AVFrame *frame, AVPacket *packet, int pixelHeight)
 {
     try {
@@ -231,8 +276,9 @@ void FFmpegMediaDecoder::videoScaledData(AVFrame *frame, AVPacket *packet, int p
         mediaData->pixel_format = frame->format;
         mediaData->width = frame->width;
         mediaData->height = pixelHeight;
-        mediaData->pts = video_pts;
-        video_pts += packet->duration;
+//        video_pts += video_last_pts==0?0:packet->pts-video_last_pts;
+//        video_last_pts = packet->pts;
+        mediaData->pts = packet->pts;
         mediaData->duration = packet->duration;
         mediaData->repeat_pict = frame->repeat_pict; //重复显示次数
         mediaData->best_timestamp = frame->best_effort_timestamp;
@@ -333,6 +379,6 @@ void FFmpegMediaDecoder::printError(const char* message)
 {
     mCallbackMutex.lock();
     if(mCallback)
-        mCallback->onDecodeError(0, message);
+        mCallback->onDecodeError(1, message);
     mCallbackMutex.unlock();
 }

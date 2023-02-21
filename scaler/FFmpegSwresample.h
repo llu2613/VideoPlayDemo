@@ -32,6 +32,8 @@ public:
     int convert(const uint8_t **in_buffer, int nb_samples,
                 uint8_t **out_buffer, int out_buffer_size);
 
+    void reset();
+
     enum AVSampleFormat inSampleFmt();
     int inSampleRate();
     uint64_t inChannelLayout();
