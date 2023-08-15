@@ -1,10 +1,10 @@
-#ifndef FFMPEGRECORDERMULTI_H
+﻿#ifndef FFMPEGRECORDERMULTI_H
 #define FFMPEGRECORDERMULTI_H
 
 #include <string>
-#include "FFmpegAudioRecorder.h"
+#include "FFmpegAudioEncoder.h"
 
-class FFmpegRecorderMulti: private FFmpegAudioRecorderCallback
+class FFmpegRecorderMulti: private FFmpegAudioEncoderCallback
 {
 public:
     FFmpegRecorderMulti();
@@ -30,7 +30,7 @@ protected:
     void onRecordError(int level, const char* msg);
 
 private:
-    FFmpegAudioRecorder recorder;
+    FFmpegAudioEncoder recorder;
     std::string filename;
     long numeral;
     long add_samples;

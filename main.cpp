@@ -119,14 +119,14 @@ int main(int argc, char *argv[])
 //    FFmpegFileMerger merger;
 //    merger.test2();
 
-    FFmpegInfo info;
-    info.read_av_info("D:\\test\\webm\\00000000514000000.mp4");
+//    FFmpegInfo info;
+//    info.read_av_info("D:\\test\\webm\\00000000514000000.mp4");
 
-    FFmpegH264Video h264video;
-    h264video.h264_avc1("D:\\test\\webm\\475FEAB4-A174-427a-8FC3-E59E3B8650731_1657108852_orig.mp4",
-                   "D:\\test\\webm\\ffff.mp4", true);
+//    FFmpegH264Video h264video;
+//    h264video.raw_h264("D:\\test\\dddddd\\aaaaaaaaaaaa英文提测版\\english.264",
+//                   "D:\\test\\dddddd\\aaaaaaaaaaaa英文提测版\\english22.264");
 
-    info.read_av_info("D:\\test\\webm\\ffff.mp4");
+//    info.read_av_info("D:\\test\\webm\\ffff.mp4");
 
     MainWindow w;
     w.show();

@@ -72,6 +72,7 @@ void SmtAudioPlayer::initialize()
                   <<"samples"<<mAudioSpec.samples<<"format"<<mAudioSpec.format;
         mSdlEventDispatcher.start();
     }
+    int cardId = openCard("", mAudioSpec, MAX_BUF_MEM_SIZE);
 }
 
 void SmtAudioPlayer::setSync(int sourceId, std::shared_ptr<AVSynchronizer> &sync)
@@ -187,6 +188,7 @@ void SmtAudioPlayer::clearData(int cardId, int sourceId)
 
 void SmtAudioPlayer::eventAudioDeviceAdded(int index, int iscapture)
 {
+    return;
     qDebug()<<"eventAddCard, index:"<<index<<"iscapture:"<<iscapture;
 
     const char *name = SDL_GetAudioDeviceName(index, iscapture);
@@ -209,6 +211,7 @@ void SmtAudioPlayer::eventAudioDeviceAdded(int index, int iscapture)
 
 void SmtAudioPlayer::eventAudioDeviceRemoved(int devid)
 {
+    return;
     qDebug()<<"eventMoveCard, ID:"<<devid;
 
     int cardId = getCardIdByDevid(devid);

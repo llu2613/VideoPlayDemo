@@ -291,7 +291,8 @@ int SdlAudioPlayer::openCard(const char* name_c,
             wanted.callback = SdlAudioPlayer::audioCallback;
             wanted.userdata = &card;
             card.device->close();
-            int ret = card.device->open(name_c, wanted)>0;
+            /*NULL is equivalent to what SDL_OpenAudio() does to choose a device*/
+            int ret = card.device->open(strlen(name_c)?name_c:NULL, wanted);
             card.enable = ret>0;
             card.name = name_c;
             card.device->setMaxMemory(maxMemory);
@@ -360,7 +361,7 @@ long SdlAudioPlayer::bufferSize(int cardId, int sourceId)
     if(card.device) {
         size = card.device->bufferSize(sourceId);
     } else {
-        INFO("Sound card is not initialized, cardId:%d", cardId);
+        DEBUG("Sound card is not initialized, cardId:%d", cardId);
     }
     card.mutex.unlock();
 
@@ -383,7 +384,7 @@ long SdlAudioPlayer::memorySize(int cardId, int sourceId)
     if(card.device) {
         size = card.device->memorySize(sourceId);
     } else {
-        INFO("Sound card is not initialized, cardId:%d", cardId);
+        DEBUG("Sound card is not initialized, cardId:%d", cardId);
     }
     card.mutex.unlock();
 
@@ -406,7 +407,7 @@ long SdlAudioPlayer::sampleSize(int cardId, int sourceId)
     if(card.device) {
         size = card.device->sampleSize(sourceId);
     } else {
-        INFO("Sound card is not initialized, cardId:%d", cardId);
+        DEBUG("Sound card is not initialized, cardId:%d", cardId);
     }
     card.mutex.unlock();
 

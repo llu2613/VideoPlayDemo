@@ -1,4 +1,4 @@
-#include "FFmpegH264Video.h"
+﻿#include "FFmpegH264Video.h"
 #include <QDebug>
 
 /*
@@ -32,6 +32,92 @@ static void _print_averror(const char *name, int err)
 
     sprintf(message, "(%s)%s", name, errbuf_ptr);
     qDebug()<<message;
+}
+
+int FFmpegH264Video::raw_h264(const char *filename, const char *out_file)
+{
+    int ret, i;
+    AVFormatContext *ifmt_ctx = NULL;
+    FILE *fp;
+    AVBSFContext *bsf_ctx = NULL;
+    AVPacket *packet = NULL;
+    AVFrame *frame = NULL;
+    int istream_h264_index = -1;
+
+    ret = avformat_open_input(&ifmt_ctx, filename, NULL, NULL);
+    if (ret < 0) {
+        _print_averror("avformat_open_input", ret);
+        goto end;
+    }
+
+    ret = avformat_find_stream_info(ifmt_ctx, NULL);
+    if (ret < 0) {
+        _print_averror("avformat_find_stream_info", ret);
+        goto end;
+    }
+
+    av_dump_format(ifmt_ctx, 0, filename, 0);
+
+    fp = fopen(out_file, "wb");
+    for (i = 0; i < ifmt_ctx->nb_streams; i++) {
+        AVStream *in_stream = ifmt_ctx->streams[i];
+        AVCodecID in_codec_id = in_stream->codecpar->codec_id;
+
+        // stream filter
+        if(in_stream->codecpar->codec_type==AVMEDIA_TYPE_VIDEO
+                && in_stream->codecpar->codec_id==AV_CODEC_ID_H264) {
+            istream_h264_index = i;
+
+            if(bsf_ctx) {
+                av_bsf_free(&bsf_ctx);
+            }
+            const AVBitStreamFilter *pfilter = av_bsf_get_by_name("h264_mp4toannexb");
+            av_bsf_alloc(pfilter, &bsf_ctx);
+            if(bsf_ctx) {
+                avcodec_parameters_copy(bsf_ctx->par_in, in_stream->codecpar);
+                bsf_ctx->time_base_in = in_stream->time_base;
+                av_bsf_init(bsf_ctx);
+            }
+            break;
+        }
+    }
+
+    packet = av_packet_alloc();
+    while (1) {
+        if ((ret = av_read_frame(ifmt_ctx, packet)) < 0)
+            break;
+
+        if(istream_h264_index!=packet->stream_index) {
+            av_packet_unref(packet);
+            continue;
+        }
+
+        //qDebug()<<"#"<<stream_index<<" dts "<<packet->dts<<" pts "<<packet->pts;
+
+        if(bsf_ctx) {
+            //AVPacket处理
+            ret = av_bsf_send_packet(bsf_ctx, packet);
+            if (ret < 0) {
+                _print_averror("av_bsf_send_packet", ret);
+            }
+            while(av_bsf_receive_packet(bsf_ctx, packet) == 0) {
+                fwrite(packet->data, packet->size, 1, fp);
+            }
+        }
+        av_packet_unref(packet);
+    }
+
+end:
+    //释放：
+    av_packet_free(&packet);
+    av_frame_free(&frame);
+
+    avformat_close_input(&ifmt_ctx);
+
+    av_bsf_free(&bsf_ctx);
+    fclose(fp);
+
+    return ret;
 }
 
 int FFmpegH264Video::h264_avc1(const char *filename, const char *out_file,
@@ -78,6 +164,8 @@ int FFmpegH264Video::h264_avc1(const char *filename, const char *out_file,
         _print_averror("avformat_alloc_output_context2", ret);
         goto end;
     }
+
+    qDebug() <<"ifmt_ctx->nb_streams"<<QString::number(ifmt_ctx->nb_streams);
 
     for (i = 0; i < ifmt_ctx->nb_streams; i++) {
         AVStream *in_stream = ifmt_ctx->streams[i];

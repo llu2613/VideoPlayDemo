@@ -77,7 +77,7 @@ void VideoBuffer::run()
                     delete data;
                     playUs += durUs;
 
-                    qDebug()<<"discard one frame";
+                    //qDebug()<<"discard one frame";
 
                     data = mDataList.takeFirst();
 //                    if(last_pts && data->pts>last_pts) {
@@ -95,7 +95,7 @@ void VideoBuffer::run()
                 if(mSync) {
                     mSync->setVideoPlayingTs(data->pts);
                     int diff = mSync->audioPlayingMs()-mSync->videoPlayingMs();
-                    qDebug()<<"audio-video="<<diff;
+                    //qDebug()<<"audio-video="<<diff;
                 }
                 mSyncMutex.unlock();
                 std::shared_ptr<MediaData> mediaData(data);

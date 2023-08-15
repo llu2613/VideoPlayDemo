@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <QDebug>
 #include "webstreamdialog.h"
+#include "widgets/timestampdialog.h"
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -79,13 +80,16 @@ void MainWindow::onOpenGLButtonGroupClicked(bool clicked)
 
 void MainWindow::on_pushButton_web_stream_clicked()
 {
-    WebStreamDialog dialog;
+//    WebStreamDialog dialog;
+//    dialog.exec();
+
+    TimestampDialog dialog;
     dialog.exec();
 
 }
 
 void MainWindow::on_pushButton_2_clicked()
 {
-    WebStreamDialog dialog;
-    dialog.exec();
+//    WebStreamDialog dialog;
+//    dialog.exec();
 }

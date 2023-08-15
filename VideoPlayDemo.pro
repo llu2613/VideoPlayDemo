@@ -55,6 +55,7 @@ DEFINES += QT_DEPRECATED_WARNINGS
 SOURCES += \
     common/yuv_pcm_file.cpp \
     decoder/FFMediaDecoder.cpp \
+    encoder/FFmpegAudioEncoder.cpp \
     encoder/FFmpegH264Video.cpp \
     encoder/FFmpegRecorderMulti.cpp \
     hw_decode.c \
@@ -85,9 +86,7 @@ SOURCES += \
     decoder/StreamMediaDecoder.cpp \
     common/RepeatableThread.cpp \
     encoder/FFmpegFileMerger.cpp \
-    encoder/FFmpegAudioRecorder.cpp \
     decoder/M3u8Parsing.cpp \
-    encoder/FFmpegAudioRecorder.cpp \
     encoder/FFmpegAudioMerger.cpp \
     decoder/FFAvioContext.cpp \
     driver/MediaDecoder.cpp \
@@ -95,11 +94,14 @@ SOURCES += \
     common/ring_buffer.c \
     tools/FFPrintInfo.cpp \
     tools/FFmpegInfo.cpp \
-    webstreamdialog.cpp
+    webstreamdialog.cpp \
+    widgets/TimestampReader.cpp \
+    widgets/timestampdialog.cpp
 
 HEADERS += \
     common/yuv_pcm_file.h \
     decoder/FFMediaDecoder.h \
+    encoder/FFmpegAudioEncoder.h \
     encoder/FFmpegH264Video.h \
     encoder/FFmpegRecorderMulti.h \
         mainwindow.h \
@@ -131,9 +133,7 @@ HEADERS += \
     decoder/StreamMediaDecoder.h \
     common/RepeatableThread.h \
     encoder/FFmpegFileMerger.h \
-    encoder/FFmpegAudioRecorder.h \
     decoder/M3u8Parsing.h \
-    encoder/FFmpegAudioRecorder.h \
     encoder/FFmpegAudioMerger.h \
     encoder/FFMergerCallback.h \
     decoder/FFAvioContext.h \
@@ -144,11 +144,14 @@ HEADERS += \
     common/ffmpeg_commons.h \
     tools/FFPrintInfo.h \
     tools/FFmpegInfo.h \
-    webstreamdialog.h
+    webstreamdialog.h \
+    widgets/TimestampReader.h \
+    widgets/timestampdialog.h
 
 FORMS += \
         mainwindow.ui \
-        webstreamdialog.ui
+        webstreamdialog.ui \
+        widgets/timestampdialog.ui
 
 RESOURCES += \
     res.qrc

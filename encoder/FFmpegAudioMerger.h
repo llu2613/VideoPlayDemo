@@ -2,7 +2,7 @@
 #define FFMPEGAUDIOMERGER_H
 
 #include "../decoder/FFmpegMediaDecoder.h"
-#include "FFmpegAudioRecorder.h"
+#include "FFmpegAudioEncoder.h"
 #include "FFMergerCallback.h"
 #include <mutex>
 #include <atomic>

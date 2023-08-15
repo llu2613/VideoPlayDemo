@@ -1,5 +1,5 @@
-﻿#ifndef FFMPEGAUDIORECORDER_H
-#define FFMPEGAUDIORECORDER_H
+﻿#ifndef FFMPEGAUDIOENCODER_H
+#define FFMPEGAUDIOENCODER_H
 
 #include <mutex>
 #include "common/ffmpeg_commons.h"
@@ -11,17 +11,17 @@ extern "C" {
 #include "libavutil/audio_fifo.h"
 }
 
-class FFmpegAudioRecorderCallback
+class FFmpegAudioEncoderCallback
 {
 public:
     virtual void onRecordError(int level, const char* msg)=0;
 };
 
-class FFmpegAudioRecorder
+class FFmpegAudioEncoder
 {
 public:
-    FFmpegAudioRecorder();
-    ~FFmpegAudioRecorder();
+    FFmpegAudioEncoder();
+    ~FFmpegAudioEncoder();
 
     int open(const char *output,
              int64_t  src_ch_layout,
@@ -40,7 +40,7 @@ public:
 
     void close();
 
-    void setCallback(FFmpegAudioRecorderCallback* callback);
+    void setCallback(FFmpegAudioEncoderCallback* callback);
 
     void setLogLevel(int level);
     bool isReady();
@@ -63,7 +63,7 @@ private:
     void statistics();
 
     std::mutex mCallbackMutex;
-    FFmpegAudioRecorderCallback *mCallback;
+    FFmpegAudioEncoderCallback *mCallback;
 
     AVFormatContext *ofmt_ctx;
     AVStream *out_stream;
@@ -80,4 +80,4 @@ private:
 
 };
 
-#endif // FFMPEGAUDIORECORDER_H
+#endif // FFMPEGAUDIOENCODER_H

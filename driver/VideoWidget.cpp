@@ -86,7 +86,7 @@ VideoWidget::VideoWidget(QWidget *parent)
 
 
 //    inputUrl->setText("http://220.161.87.62:8800/hls/0/index.m3u8");
-    inputUrl->setText("rtsp://192.168.88.17/forward");
+    inputUrl->setText("rtsp://192.168.21.221/forward");
 //    inputUrl->setText("http://192.168.31.233:9000/devrecorda02c237ee64441e5b90f5e6c7ab616cf1/19700101084735036-1-3-A02C237E-E644-41E5-B90F-5E6C7AB616CF-0100811318.ts");
 //    inputUrl->setText("rtsp://admin:abc123456@192.168.1.165:554/h264/ch1/main/av_stream");
 //    inputUrl->setText("rtsp://192.168.1.151/audiotracker_1");
@@ -108,8 +108,7 @@ VideoWidget::VideoWidget(QWidget *parent)
     connect(openBtn, &QPushButton::clicked, [this,inputUrl](){
         QString url = inputUrl->text();
         if(url.length()) {
-//            decoder->stopPlay();
-            decoder->startPlay(url, false);
+            decoder->startPlay(url, true);
         }
     });
     connect(closeBtn, &QPushButton::clicked, [this](){

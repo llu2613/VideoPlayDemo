@@ -1,4 +1,4 @@
-#ifndef FFMPEGH264VIDEO_H
+﻿#ifndef FFMPEGH264VIDEO_H
 #define FFMPEGH264VIDEO_H
 
 #include "common/ffmpeg_commons.h"
@@ -8,6 +8,8 @@ class FFmpegH264Video
 public:
     FFmpegH264Video();
     virtual ~FFmpegH264Video();
+
+    int raw_h264(const char *filename, const char *out_file);
 
     int h264_avc1(const char *filename, const char *out_file,
                   bool reset_dts=false);

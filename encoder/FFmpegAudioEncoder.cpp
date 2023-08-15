@@ -1,4 +1,4 @@
-﻿#include "FFmpegAudioRecorder.h"
+﻿#include "FFmpegAudioEncoder.h"
 #include <string>
 #include <list>
 #include <vector>
@@ -65,7 +65,7 @@ static uint64_t select_channel_layout(const AVCodec *codec, uint64_t default_lay
     return best_ch_layout;
 }
 
-FFmpegAudioRecorder::FFmpegAudioRecorder()
+FFmpegAudioEncoder::FFmpegAudioEncoder()
 {
     ofmt_ctx = nullptr;
     out_stream = nullptr;
@@ -84,12 +84,12 @@ FFmpegAudioRecorder::FFmpegAudioRecorder()
     mCallback = nullptr;
 }
 
-FFmpegAudioRecorder::~FFmpegAudioRecorder()
+FFmpegAudioEncoder::~FFmpegAudioEncoder()
 {
     close();
 }
 
-int FFmpegAudioRecorder::flush_encoder(AVFormatContext *ofmt_ctx,int stream_index)
+int FFmpegAudioEncoder::flush_encoder(AVFormatContext *ofmt_ctx,int stream_index)
 {
     int ret;
 
@@ -107,7 +107,7 @@ int FFmpegAudioRecorder::flush_encoder(AVFormatContext *ofmt_ctx,int stream_inde
     return ret;
 }
 
-int FFmpegAudioRecorder::flush_audio_fifo(int stream_index)
+int FFmpegAudioEncoder::flush_audio_fifo(int stream_index)
 {
     int ret = 0;
     const int output_frame_size = enc_ctx->frame_size;
@@ -135,7 +135,7 @@ int FFmpegAudioRecorder::flush_audio_fifo(int stream_index)
     return ret;
 }
 
-int FFmpegAudioRecorder::open(const char *output,
+int FFmpegAudioEncoder::open(const char *output,
                               int64_t src_ch_layout,
                               enum AVSampleFormat src_sample_fmt,
                               int src_sample_rate)
@@ -148,7 +148,7 @@ int FFmpegAudioRecorder::open(const char *output,
          out_ch_layout, out_sample_fmt, out_sample_rate);
 }
 
-int FFmpegAudioRecorder::open(const char *output,
+int FFmpegAudioEncoder::open(const char *output,
                               int64_t  src_ch_layout, enum AVSampleFormat src_sample_fmt, int src_sample_rate,
                               int64_t  out_ch_layout, enum AVSampleFormat out_sample_fmt, int out_sample_rate)
 {
@@ -167,7 +167,7 @@ int FFmpegAudioRecorder::open(const char *output,
                 out_ch_layout, out_sample_fmt, out_sample_rate);
 }
 
-int FFmpegAudioRecorder::open(const char *output, const char *format_name, enum AVCodecID codec_id,
+int FFmpegAudioEncoder::open(const char *output, const char *format_name, enum AVCodecID codec_id,
                               int64_t  src_ch_layout, enum AVSampleFormat src_sample_fmt, int src_sample_rate,
                               int64_t  out_ch_layout, enum AVSampleFormat out_sample_fmt, int out_sample_rate)
 {
@@ -328,7 +328,7 @@ int FFmpegAudioRecorder::open(const char *output, const char *format_name, enum 
     return 0;
 }
 
-int FFmpegAudioRecorder::addData(AVFrame *frame, AVPacket *packet)
+int FFmpegAudioEncoder::addData(AVFrame *frame, AVPacket *packet)
 {
     if(!swr_ctx) {
         av_log(NULL,AV_LOG_ERROR,"swr_ctx is null!\n");
@@ -368,7 +368,7 @@ int FFmpegAudioRecorder::addData(AVFrame *frame, AVPacket *packet)
     return 0;
 }
 
-int FFmpegAudioRecorder::init_output_frame(AVFrame **frame,
+int FFmpegAudioEncoder::init_output_frame(AVFrame **frame,
     AVCodecContext *output_codec_context, int frame_size)
 {
     int error;
@@ -393,7 +393,7 @@ int FFmpegAudioRecorder::init_output_frame(AVFrame **frame,
     return 0;
 }
 
-int FFmpegAudioRecorder::write_samples_to_fifo(AVAudioFifo *fifo,
+int FFmpegAudioEncoder::write_samples_to_fifo(AVAudioFifo *fifo,
     uint8_t **converted_input_samples,
     const int nb_samples)
 {
@@ -412,7 +412,7 @@ int FFmpegAudioRecorder::write_samples_to_fifo(AVAudioFifo *fifo,
     return 0;
 }
 
-int FFmpegAudioRecorder::encode_write_frame_fifo(AVFrame *filt_frame, int stream_index) {
+int FFmpegAudioEncoder::encode_write_frame_fifo(AVFrame *filt_frame, int stream_index) {
     int ret = 0;
 
     const int output_frame_size = enc_ctx->frame_size;
@@ -445,7 +445,7 @@ int FFmpegAudioRecorder::encode_write_frame_fifo(AVFrame *filt_frame, int stream
     return ret;
 }
 
-int FFmpegAudioRecorder::encode_write_frame(AVFrame *filt_frame, int stream_index) {
+int FFmpegAudioEncoder::encode_write_frame(AVFrame *filt_frame, int stream_index) {
     int ret;
     AVPacket enc_pkt;
 
@@ -501,7 +501,7 @@ int FFmpegAudioRecorder::encode_write_frame(AVFrame *filt_frame, int stream_inde
     return ret;
 }
 
-void FFmpegAudioRecorder::dump_codec(AVCodec *pCodec)
+void FFmpegAudioEncoder::dump_codec(AVCodec *pCodec)
 {
     char text[4096];
     std::vector<AVSampleFormat> sample_fmts;
@@ -546,7 +546,7 @@ void FFmpegAudioRecorder::dump_codec(AVCodec *pCodec)
     av_log(NULL, AV_LOG_INFO, text);
 }
 
-void FFmpegAudioRecorder::statistics()
+void FFmpegAudioEncoder::statistics()
 {
     char text[4096];
     sprintf(text, "statistics:{ enc_sample_rate:%d, enc_channel_layout:%d(ch:%d), enc_codec_id:%d(%s), "
@@ -560,7 +560,7 @@ void FFmpegAudioRecorder::statistics()
     av_log(NULL, AV_LOG_DEBUG, text);
 }
 
-void FFmpegAudioRecorder::close()
+void FFmpegAudioEncoder::close()
 {
     int ret = 0;
     //刷新编码器的缓冲区
@@ -598,7 +598,7 @@ void FFmpegAudioRecorder::close()
     }
 }
 
-void FFmpegAudioRecorder::av_log(void *avcl, int level, const char *fmt, ...)
+void FFmpegAudioEncoder::av_log(void *avcl, int level, const char *fmt, ...)
 {
     char sprint_buf[1024];
 
@@ -612,7 +612,7 @@ void FFmpegAudioRecorder::av_log(void *avcl, int level, const char *fmt, ...)
         print_errmsg(level, sprint_buf);
 }
 
-void FFmpegAudioRecorder::print_errmsg(int level, const char *msg)
+void FFmpegAudioEncoder::print_errmsg(int level, const char *msg)
 {
     mCallbackMutex.lock();
     if(mCallback)
@@ -622,18 +622,18 @@ void FFmpegAudioRecorder::print_errmsg(int level, const char *msg)
     mCallbackMutex.unlock();
 }
 
-void FFmpegAudioRecorder::setCallback(FFmpegAudioRecorderCallback* callback)
+void FFmpegAudioEncoder::setCallback(FFmpegAudioEncoderCallback* callback)
 {
     std::lock_guard<std::mutex> lk(mCallbackMutex);
     mCallback = callback;
 }
 
-void FFmpegAudioRecorder::setLogLevel(int level)
+void FFmpegAudioEncoder::setLogLevel(int level)
 {
     log_level = level;
 }
 
-bool FFmpegAudioRecorder::isReady()
+bool FFmpegAudioEncoder::isReady()
 {
     return ofmt_ctx && swr_ctx && audio_fifo && audio_data;
 }
